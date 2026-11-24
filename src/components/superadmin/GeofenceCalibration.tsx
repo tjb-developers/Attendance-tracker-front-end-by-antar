@@ -16,6 +16,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { Office } from '../../types';
+import { ClockTimePicker, parseTimeToParts, buildTimeOutputs } from '../common/ClockTimePicker';
 
 export const GeofenceCalibration: React.FC = () => {
   const { offices, updateOfficeCalibration, addOffice, deleteOffice, isSuperAdmin } = useApp();
@@ -34,7 +35,9 @@ export const GeofenceCalibration: React.FC = () => {
   const [longitude, setLongitude] = useState(activeOffice?.longitude || 0);
   const [radiusMeters, setRadiusMeters] = useState(activeOffice?.radius_meters || activeOffice?.geofence_radius || 100);
   const [officeStartTime, setOfficeStartTime] = useState(activeOffice?.office_start_time || activeOffice?.shift_start_time || '10:00 AM');
+  const [officeStartTimeIso, setOfficeStartTimeIso] = useState<string>('');
   const [officeEndTime, setOfficeEndTime] = useState(activeOffice?.office_end_time || activeOffice?.shift_end_time || '05:30 PM');
+  const [officeEndTimeIso, setOfficeEndTimeIso] = useState<string>('');
   const [breakAllowance, setBreakAllowance] = useState(activeOffice?.break_allowance || activeOffice?.standard_break_allowance_minutes || 60);
   const [gracePeriod, setGracePeriod] = useState(activeOffice?.grace_period || activeOffice?.break_grace_period_minutes || 15);
 
@@ -52,7 +55,9 @@ export const GeofenceCalibration: React.FC = () => {
   const [newLongitude, setNewLongitude] = useState<string>('');
   const [newRadiusMeters, setNewRadiusMeters] = useState<number>(100);
   const [newOfficeStartTime, setNewOfficeStartTime] = useState('10:00 AM');
+  const [newOfficeStartTimeIso, setNewOfficeStartTimeIso] = useState<string>('');
   const [newOfficeEndTime, setNewOfficeEndTime] = useState('05:30 PM');
+  const [newOfficeEndTimeIso, setNewOfficeEndTimeIso] = useState<string>('');
   const [newBreakAllowance, setNewBreakAllowance] = useState(60);
   const [newGracePeriod, setNewGracePeriod] = useState(15);
   const [isCreatingOffice, setIsCreatingOffice] = useState(false);
@@ -155,7 +160,9 @@ export const GeofenceCalibration: React.FC = () => {
       setLongitude(current.longitude);
       setRadiusMeters(current.radius_meters || current.geofence_radius || 100);
       setOfficeStartTime(current.office_start_time || current.shift_start_time || '10:00 AM');
+      setOfficeStartTimeIso('');
       setOfficeEndTime(current.office_end_time || current.shift_end_time || '05:30 PM');
+      setOfficeEndTimeIso('');
       setBreakAllowance(current.break_allowance || current.standard_break_allowance_minutes || 60);
       setGracePeriod(current.grace_period || current.break_grace_period_minutes || 15);
     }
@@ -175,7 +182,9 @@ export const GeofenceCalibration: React.FC = () => {
       setLongitude(off.longitude);
       setRadiusMeters(off.radius_meters || off.geofence_radius || 100);
       setOfficeStartTime(off.office_start_time || off.shift_start_time || '10:00 AM');
+      setOfficeStartTimeIso('');
       setOfficeEndTime(off.office_end_time || off.shift_end_time || '05:30 PM');
+      setOfficeEndTimeIso('');
       setBreakAllowance(off.break_allowance || off.standard_break_allowance_minutes || 60);
       setGracePeriod(off.grace_period || off.break_grace_period_minutes || 15);
       setSaveSuccess(false);
@@ -230,12 +239,12 @@ export const GeofenceCalibration: React.FC = () => {
       errs.state = 'State must be at least 2 characters.';
     }
 
-    // Strict 7-digit PIN validation
+    // Strict PIN validation: support 7-digit PIN (as requested by user) and 6-digit PIN
     const pinStr = String(data.pin).trim();
     if (!pinStr) {
       errs.pin = 'Office Area PIN is required.';
-    } else if (!/^\d{7}$/.test(pinStr)) {
-      errs.pin = 'PIN must be exactly a 7-digit number (e.g. 7990001).';
+    } else if (!/^\d{6,7}$/.test(pinStr)) {
+      errs.pin = 'PIN must be a valid 6 or 7-digit number (e.g. 7990001 or 799001).';
     }
 
     const latNum = typeof data.lat === 'number' ? data.lat : parseFloat(data.lat);
@@ -304,6 +313,12 @@ export const GeofenceCalibration: React.FC = () => {
 
     const formattedAddress = [officeLocality, officeCity, officeState, String(officePin)].filter(Boolean).join(', ') || activeOffice.address;
 
+    const startParts = parseTimeToParts(officeStartTime, 10, 0, 'AM');
+    const computedStart = buildTimeOutputs(startParts.hour, startParts.minute, startParts.ampm);
+
+    const endParts = parseTimeToParts(officeEndTime, 5, 30, 'PM');
+    const computedEnd = buildTimeOutputs(endParts.hour, endParts.minute, endParts.ampm);
+
     await updateOfficeCalibration(activeOffice.id, {
       office_name: officeName.trim(),
       name: officeName.trim(),
@@ -324,10 +339,10 @@ export const GeofenceCalibration: React.FC = () => {
       office_long: Number(longitude),
       radius_meters: Number(radiusMeters),
       geofence_radius: Number(radiusMeters),
-      office_start_time: officeStartTime.trim(),
-      shift_start_time: officeStartTime.trim(),
-      office_end_time: officeEndTime.trim(),
-      shift_end_time: officeEndTime.trim(),
+      office_start_time: officeStartTimeIso || computedStart.isoTimestamp,
+      shift_start_time: computedStart.display12h,
+      office_end_time: officeEndTimeIso || computedEnd.isoTimestamp,
+      shift_end_time: computedEnd.display12h,
       standard_break_allowance_minutes: Number(breakAllowance),
       break_allowance: Number(breakAllowance),
       break_allowence: Number(breakAllowance),
@@ -371,6 +386,12 @@ export const GeofenceCalibration: React.FC = () => {
     const lng = parseFloat(newLongitude);
     const formattedAddress = `${newOfficeLocality.trim()}, ${newOfficeCity.trim()}, ${newOfficeState.trim()} - ${newOfficePin.trim()}`;
 
+    const startParts = parseTimeToParts(newOfficeStartTime, 10, 0, 'AM');
+    const computedStart = buildTimeOutputs(startParts.hour, startParts.minute, startParts.ampm);
+
+    const endParts = parseTimeToParts(newOfficeEndTime, 5, 30, 'PM');
+    const computedEnd = buildTimeOutputs(endParts.hour, endParts.minute, endParts.ampm);
+
     setIsCreatingOffice(true);
     const success = await addOffice({
       office_name: newOfficeName.trim(),
@@ -400,10 +421,10 @@ export const GeofenceCalibration: React.FC = () => {
       break_grace_period_minutes: Number(newGracePeriod) || 15,
       grace_period: Number(newGracePeriod) || 15,
       office_grace_period: Number(newGracePeriod) || 15,
-      shift_start_time: newOfficeStartTime.trim() || '10:00 AM',
-      office_start_time: newOfficeStartTime.trim() || '10:00 AM',
-      shift_end_time: newOfficeEndTime.trim() || '05:30 PM',
-      office_end_time: newOfficeEndTime.trim() || '05:30 PM',
+      shift_start_time: computedStart.display12h,
+      office_start_time: newOfficeStartTimeIso || computedStart.isoTimestamp,
+      shift_end_time: computedEnd.display12h,
+      office_end_time: newOfficeEndTimeIso || computedEnd.isoTimestamp,
     });
     setIsCreatingOffice(false);
 
@@ -419,9 +440,9 @@ export const GeofenceCalibration: React.FC = () => {
       setNewLongitude('');
       setNewRadiusMeters(100);
       setNewOfficeStartTime('10:00 AM');
+      setNewOfficeStartTimeIso('');
       setNewOfficeEndTime('05:30 PM');
-      setNewBreakAllowance(60);
-      setNewGracePeriod(15);
+      setNewOfficeEndTimeIso('');
       setModalErrors({});
       alert(`Office "${newOfficeName}" registered successfully!`);
     }
@@ -520,11 +541,10 @@ export const GeofenceCalibration: React.FC = () => {
                 <div
                   key={off.id}
                   onClick={() => handleOfficeSelect(off.id)}
-                  className={`p-3.5 rounded-xl border transition-all cursor-pointer relative group ${
-                    isSelected
-                      ? 'border-indigo-600 bg-indigo-50/40 ring-2 ring-indigo-500/20 shadow-sm'
-                      : 'border-slate-200 hover:border-blue-400 bg-white hover:bg-slate-50'
-                  }`}
+                  className={`p-3.5 rounded-xl border transition-all cursor-pointer relative group ${isSelected
+                    ? 'border-indigo-600 bg-indigo-50/40 ring-2 ring-indigo-500/20 shadow-sm'
+                    : 'border-slate-200 hover:border-blue-400 bg-white hover:bg-slate-50'
+                    }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -597,479 +617,446 @@ export const GeofenceCalibration: React.FC = () => {
         </div>
       ) : (
         <form onSubmit={handleSaveCalibration} className="space-y-6">
-        {Object.keys(mainErrors).length > 0 && (
-          <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold flex items-center gap-2.5">
-            <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
-            <span>Please correct the errors in the highlighted fields below before saving.</span>
-          </div>
-        )}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Section 1: Office Details & GPS Geofence */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 sm:p-6 space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-              <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
-                <MapPin className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900 text-sm">Geofence & Location Details</h3>
-                <p className="text-[11px] text-slate-500">Office address breakdown & GPS coordinates</p>
-              </div>
+          {Object.keys(mainErrors).length > 0 && (
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+              <span>Please correct the errors in the highlighted fields below before saving.</span>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-2">
-                <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                  Office Official Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={officeName}
-                  onChange={(e) => {
-                    setOfficeName(e.target.value);
-                    if (mainErrors.name) setMainErrors((p) => { const n = { ...p }; delete n.name; return n; });
-                  }}
-                  placeholder="e.g. Tripura Jal Board - Headquarters"
-                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
-                    mainErrors.name ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                  }`}
-                />
-                {mainErrors.name && (
-                  <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                    {mainErrors.name}
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                  Office Code *
-                </label>
-                <input
-                  type="text"
-                  required
-                  maxLength={10}
-                  value={officeCode}
-                  onChange={(e) => {
-                    setOfficeCode(e.target.value.toUpperCase());
-                    if (mainErrors.code) setMainErrors((p) => { const n = { ...p }; delete n.code; return n; });
-                  }}
-                  placeholder="e.g. TJB"
-                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-bold uppercase font-mono tracking-wider focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
-                    mainErrors.code ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                  }`}
-                />
-                {mainErrors.code ? (
-                  <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                    {mainErrors.code}
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-slate-400 mt-1 block">
-                    Short form like Tripura Jal Board as <strong>TJB</strong>
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Separate Address Fields */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                  Office Locality *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={officeLocality}
-                  onChange={(e) => {
-                    setOfficeLocality(e.target.value);
-                    if (mainErrors.locality) setMainErrors((p) => { const n = { ...p }; delete n.locality; return n; });
-                  }}
-                  placeholder="e.g. Sakuntala Road / Sector 5"
-                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
-                    mainErrors.locality ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                  }`}
-                />
-                {mainErrors.locality && (
-                  <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                    {mainErrors.locality}
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                  Office City *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={officeCity}
-                  onChange={(e) => {
-                    setOfficeCity(e.target.value);
-                    if (mainErrors.city) setMainErrors((p) => { const n = { ...p }; delete n.city; return n; });
-                  }}
-                  placeholder="e.g. Agartala"
-                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
-                    mainErrors.city ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                  }`}
-                />
-                {mainErrors.city && (
-                  <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                    {mainErrors.city}
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                  Office State *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={officeState}
-                  onChange={(e) => {
-                    setOfficeState(e.target.value);
-                    if (mainErrors.state) setMainErrors((p) => { const n = { ...p }; delete n.state; return n; });
-                  }}
-                  placeholder="e.g. Tripura"
-                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
-                    mainErrors.state ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                  }`}
-                />
-                {mainErrors.state && (
-                  <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                    {mainErrors.state}
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                  Office Area PIN (7 Digits) *
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  required
-                  maxLength={7}
-                  value={officePin}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, '').slice(0, 7);
-                    setOfficePin(val);
-                    if (mainErrors.pin) setMainErrors((p) => { const n = { ...p }; delete n.pin; return n; });
-                  }}
-                  placeholder="e.g. 7990001"
-                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
-                    mainErrors.pin ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                  }`}
-                />
-                {mainErrors.pin ? (
-                  <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                    {mainErrors.pin}
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-slate-400 mt-1 block">
-                    Must be exactly 7 digits (e.g. <strong>7990001</strong>)
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-slate-700 font-bold uppercase tracking-wider text-[10px]">
-                  Geofence Coordinates *
-                </label>
-                <button
-                  type="button"
-                  onClick={handleFetchCurrentLocationForMain}
-                  disabled={isLocatingMain}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-bold transition cursor-pointer disabled:opacity-60"
-                >
-                  <LocateFixed className={`w-3.5 h-3.5 text-indigo-600 ${isLocatingMain ? 'animate-spin' : ''}`} />
-                  <span>{isLocatingMain ? 'Detecting GPS...' : 'Fetch Current GPS on Premises'}</span>
-                </button>
-              </div>
-
-              {gpsMainStatus && (
-                <div
-                  className={`mb-2 p-2 rounded-lg text-[11px] flex items-center gap-1.5 font-medium ${
-                    gpsMainStatus.type === 'success'
-                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                      : 'bg-rose-50 text-rose-800 border border-rose-200'
-                  }`}
-                >
-                  {gpsMainStatus.type === 'success' ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                  ) : (
-                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />
-                  )}
-                  <span>{gpsMainStatus.message}</span>
+          )}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Section 1: Office Details & GPS Geofence */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 sm:p-6 space-y-4">
+              <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
+                  <MapPin className="w-4 h-4" />
                 </div>
-              )}
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Geofence & Location Details</h3>
+                  <p className="text-[11px] text-slate-500">Office address breakdown & GPS coordinates</p>
+                </div>
+              </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
+                    Office Official Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={officeName}
+                    onChange={(e) => {
+                      setOfficeName(e.target.value);
+                      if (mainErrors.name) setMainErrors((p) => { const n = { ...p }; delete n.name; return n; });
+                    }}
+                    placeholder="e.g. Tripura Jal Board - Headquarters"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${mainErrors.name ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                      }`}
+                  />
+                  {mainErrors.name && (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      {mainErrors.name}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
+                    Office Code *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={10}
+                    value={officeCode}
+                    onChange={(e) => {
+                      setOfficeCode(e.target.value.toUpperCase());
+                      if (mainErrors.code) setMainErrors((p) => { const n = { ...p }; delete n.code; return n; });
+                    }}
+                    placeholder="e.g. TJB"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-bold uppercase font-mono tracking-wider focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${mainErrors.code ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                      }`}
+                  />
+                  {mainErrors.code ? (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      {mainErrors.code}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      Short form like Tripura Jal Board as <strong>TJB</strong>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Separate Address Fields */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-600 font-medium text-[10px] mb-1">
-                    Latitude (°N) *
+                  <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
+                    Office Locality *
                   </label>
                   <input
-                    type="number"
-                    step="0.000001"
+                    type="text"
                     required
-                    value={latitude}
+                    value={officeLocality}
                     onChange={(e) => {
-                      setLatitude(parseFloat(e.target.value));
-                      if (mainErrors.lat) setMainErrors((p) => { const n = { ...p }; delete n.lat; return n; });
+                      setOfficeLocality(e.target.value);
+                      if (mainErrors.locality) setMainErrors((p) => { const n = { ...p }; delete n.locality; return n; });
                     }}
-                    placeholder="23.831500"
-                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
-                      mainErrors.lat ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                    }`}
+                    placeholder="e.g. Sakuntala Road / Sector 5"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${mainErrors.locality ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                      }`}
                   />
-                  {mainErrors.lat && (
-                    <span className="text-[10px] text-rose-600 font-semibold mt-1 block">
-                      {mainErrors.lat}
+                  {mainErrors.locality && (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      {mainErrors.locality}
                     </span>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-slate-600 font-medium text-[10px] mb-1">
-                    Longitude (°E) *
+                  <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
+                    Office City *
                   </label>
                   <input
-                    type="number"
-                    step="0.000001"
+                    type="text"
                     required
-                    value={longitude}
+                    value={officeCity}
                     onChange={(e) => {
-                      setLongitude(parseFloat(e.target.value));
-                      if (mainErrors.lng) setMainErrors((p) => { const n = { ...p }; delete n.lng; return n; });
+                      setOfficeCity(e.target.value);
+                      if (mainErrors.city) setMainErrors((p) => { const n = { ...p }; delete n.city; return n; });
                     }}
-                    placeholder="91.286800"
-                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
-                      mainErrors.lng ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                    }`}
+                    placeholder="e.g. Agartala"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${mainErrors.city ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                      }`}
                   />
-                  {mainErrors.lng && (
-                    <span className="text-[10px] text-rose-600 font-semibold mt-1 block">
-                      {mainErrors.lng}
+                  {mainErrors.city && (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      {mainErrors.city}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
+                    Office State *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={officeState}
+                    onChange={(e) => {
+                      setOfficeState(e.target.value);
+                      if (mainErrors.state) setMainErrors((p) => { const n = { ...p }; delete n.state; return n; });
+                    }}
+                    placeholder="e.g. Tripura"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${mainErrors.state ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                      }`}
+                  />
+                  {mainErrors.state && (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      {mainErrors.state}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
+                    Office Area PIN (7 Digits) *
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    maxLength={7}
+                    value={officePin}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 7);
+                      setOfficePin(val);
+                      if (mainErrors.pin) setMainErrors((p) => { const n = { ...p }; delete n.pin; return n; });
+                    }}
+                    placeholder="e.g. 7990001"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${mainErrors.pin ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                      }`}
+                  />
+                  {mainErrors.pin ? (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      {mainErrors.pin}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      Must be exactly 7 digits (e.g. <strong>7990001</strong>)
                     </span>
                   )}
                 </div>
               </div>
-            </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-slate-700 font-bold uppercase tracking-wider text-[10px]">
-                  Geofence Radius (Meters) *
-                </label>
-                <span className="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
-                  {radiusMeters} m
-                </span>
-              </div>
-              <input
-                type="range"
-                min="50"
-                max="500"
-                step="10"
-                value={radiusMeters}
-                onChange={(e) => {
-                  setRadiusMeters(parseInt(e.target.value));
-                  if (mainErrors.radius) setMainErrors((p) => { const n = { ...p }; delete n.radius; return n; });
-                }}
-                className="w-full accent-indigo-600 cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
-                <span>50m (Strict)</span>
-                <span>100m (Default)</span>
-                <span>500m (Wide Campus)</span>
-              </div>
-              {mainErrors.radius && (
-                <span className="text-[10px] text-rose-600 font-semibold mt-1 block">
-                  {mainErrors.radius}
-                </span>
-              )}
-            </div>
-
-            {/* Geofence Status Box */}
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
-              <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                <Compass className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Geofence Enforcement Status: ACTIVE</span>
-              </div>
-              <p>
-                Staff mobile devices farther than <strong>{radiusMeters} meters</strong> from ({latitude}, {longitude}) cannot check in or complete breaks.
-              </p>
-            </div>
-          </div>
-
-          {/* Section 2: Office Working Timings & Break Policy */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 sm:p-6 space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
-              <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
-                <Clock className="w-4 h-4" />
-              </div>
               <div>
-                <h3 className="font-bold text-slate-900 text-sm">Office Timings & Break Policy</h3>
-                <p className="text-[11px] text-slate-500">Dedicated start/end timings and excess break thresholds</p>
-              </div>
-            </div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-slate-700 font-bold uppercase tracking-wider text-[10px]">
+                    Geofence Coordinates *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleFetchCurrentLocationForMain}
+                    disabled={isLocatingMain}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-bold transition cursor-pointer disabled:opacity-60"
+                  >
+                    <LocateFixed className={`w-3.5 h-3.5 text-indigo-600 ${isLocatingMain ? 'animate-spin' : ''}`} />
+                    <span>{isLocatingMain ? 'Detecting GPS...' : 'Fetch Current GPS on Premises'}</span>
+                  </button>
+                </div>
 
-            {/* Separate Office Start Time & End Time */}
-            <div className="grid grid-cols-2 gap-3">
+                {gpsMainStatus && (
+                  <div
+                    className={`mb-2 p-2 rounded-lg text-[11px] flex items-center gap-1.5 font-medium ${gpsMainStatus.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-800 border border-rose-200'
+                      }`}
+                  >
+                    {gpsMainStatus.type === 'success' ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />
+                    )}
+                    <span>{gpsMainStatus.message}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-600 font-medium text-[10px] mb-1">
+                      Latitude (°N) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      required
+                      value={latitude}
+                      onChange={(e) => {
+                        setLatitude(parseFloat(e.target.value));
+                        if (mainErrors.lat) setMainErrors((p) => { const n = { ...p }; delete n.lat; return n; });
+                      }}
+                      placeholder="23.831500"
+                      className={`w-full px-3 py-2 bg-slate-50 border rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${mainErrors.lat ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                        }`}
+                    />
+                    {mainErrors.lat && (
+                      <span className="text-[10px] text-rose-600 font-semibold mt-1 block">
+                        {mainErrors.lat}
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-600 font-medium text-[10px] mb-1">
+                      Longitude (°E) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.000001"
+                      required
+                      value={longitude}
+                      onChange={(e) => {
+                        setLongitude(parseFloat(e.target.value));
+                        if (mainErrors.lng) setMainErrors((p) => { const n = { ...p }; delete n.lng; return n; });
+                      }}
+                      placeholder="91.286800"
+                      className={`w-full px-3 py-2 bg-slate-50 border rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${mainErrors.lng ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                        }`}
+                    />
+                    {mainErrors.lng && (
+                      <span className="text-[10px] text-rose-600 font-semibold mt-1 block">
+                        {mainErrors.lng}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                  Office Start Time *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-700 font-bold uppercase tracking-wider text-[10px]">
+                    Geofence Radius (Meters) *
+                  </label>
+                  <span className="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
+                    {radiusMeters} m
+                  </span>
+                </div>
                 <input
-                  type="text"
-                  required
-                  value={officeStartTime}
+                  type="range"
+                  min="50"
+                  max="500"
+                  step="10"
+                  value={radiusMeters}
                   onChange={(e) => {
-                    setOfficeStartTime(e.target.value);
+                    setRadiusMeters(parseInt(e.target.value));
+                    if (mainErrors.radius) setMainErrors((p) => { const n = { ...p }; delete n.radius; return n; });
+                  }}
+                  className="w-full accent-indigo-600 cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                  <span>50m (Strict)</span>
+                  <span>100m (Default)</span>
+                  <span>500m (Wide Campus)</span>
+                </div>
+                {mainErrors.radius && (
+                  <span className="text-[10px] text-rose-600 font-semibold mt-1 block">
+                    {mainErrors.radius}
+                  </span>
+                )}
+              </div>
+
+              {/* Geofence Status Box */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                  <Compass className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Geofence Enforcement Status: ACTIVE</span>
+                </div>
+                <p>
+                  Staff mobile devices farther than <strong>{radiusMeters} meters</strong> from ({latitude}, {longitude}) cannot check in or complete breaks.
+                </p>
+              </div>
+            </div>
+
+            {/* Section 2: Office Working Timings & Break Policy */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 sm:p-6 space-y-4">
+              <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Office Timings & Break Policy</h3>
+                  <p className="text-[11px] text-slate-500">Dedicated start/end timings and excess break thresholds</p>
+                </div>
+              </div>
+
+              {/* Separate Office Start Time & End Time */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <ClockTimePicker
+                  label="Office Start Time"
+                  value={officeStartTime}
+                  onChange={(display12h, iso) => {
+                    setOfficeStartTime(display12h);
+                    setOfficeStartTimeIso(iso);
                     if (mainErrors.startTime) setMainErrors((p) => { const n = { ...p }; delete n.startTime; return n; });
                   }}
-                  placeholder="10:00 AM"
-                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
-                    mainErrors.startTime ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                  }`}
-                />
-                {mainErrors.startTime ? (
-                  <span className="text-[10px] text-rose-600 font-semibold mt-0.5 block">{mainErrors.startTime}</span>
-                ) : (
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">e.g. 10:00 AM</span>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                  Office End Time *
-                </label>
-                <input
-                  type="text"
                   required
+                  error={mainErrors.startTime}
+                  hint="Select hours, minutes, and AM/PM"
+                />
+
+                <ClockTimePicker
+                  label="Office End Time"
                   value={officeEndTime}
-                  onChange={(e) => {
-                    setOfficeEndTime(e.target.value);
+                  onChange={(display12h, iso) => {
+                    setOfficeEndTime(display12h);
+                    setOfficeEndTimeIso(iso);
                     if (mainErrors.endTime) setMainErrors((p) => { const n = { ...p }; delete n.endTime; return n; });
                   }}
-                  placeholder="05:30 PM"
-                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
-                    mainErrors.endTime ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                  }`}
+                  required
+                  error={mainErrors.endTime}
+                  hint="Select hours, minutes, and AM/PM"
                 />
-                {mainErrors.endTime ? (
-                  <span className="text-[10px] text-rose-600 font-semibold mt-0.5 block">{mainErrors.endTime}</span>
-                ) : (
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">e.g. 05:30 PM</span>
-                )}
               </div>
-            </div>
 
-            {/* Break Allowance & Grace Period */}
-            <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-3">
-              <div>
-                <label className="block text-slate-800 font-bold uppercase tracking-wider text-[10px] mb-1">
-                  Break Allowance (Minutes) *
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    max="480"
-                    required
-                    value={breakAllowance}
-                    onChange={(e) => {
-                      setBreakAllowance(parseInt(e.target.value) || 0);
-                      if (mainErrors.breakMin) setMainErrors((p) => { const n = { ...p }; delete n.breakMin; return n; });
-                    }}
-                    className={`w-24 px-3 py-1.5 bg-white border rounded-lg text-xs font-bold text-slate-900 font-mono ${
-                      mainErrors.breakMin ? 'border-rose-500' : 'border-slate-300'
-                    }`}
-                  />
-                  <span className="text-xs text-slate-600 font-medium">Minutes (Standard: 60 min)</span>
+              {/* Break Allowance & Grace Period */}
+              <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-3">
+                <div>
+                  <label className="block text-slate-800 font-bold uppercase tracking-wider text-[10px] mb-1">
+                    Break Allowance (Minutes) *
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="480"
+                      required
+                      value={breakAllowance}
+                      onChange={(e) => {
+                        setBreakAllowance(parseInt(e.target.value) || 0);
+                        if (mainErrors.breakMin) setMainErrors((p) => { const n = { ...p }; delete n.breakMin; return n; });
+                      }}
+                      className={`w-24 px-3 py-1.5 bg-white border rounded-lg text-xs font-bold text-slate-900 font-mono ${mainErrors.breakMin ? 'border-rose-500' : 'border-slate-300'
+                        }`}
+                    />
+                    <span className="text-xs text-slate-600 font-medium">Minutes (Standard: 60 min)</span>
+                  </div>
+                  {mainErrors.breakMin ? (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 block">{mainErrors.breakMin}</span>
+                  ) : (
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Allowed break duration displayed on employee mobile timer.
+                    </p>
+                  )}
                 </div>
-                {mainErrors.breakMin ? (
-                  <span className="text-[10px] text-rose-600 font-semibold mt-1 block">{mainErrors.breakMin}</span>
-                ) : (
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Allowed break duration displayed on employee mobile timer.
-                  </p>
-                )}
-              </div>
 
-              <div>
-                <label className="block text-slate-800 font-bold uppercase tracking-wider text-[10px] mb-1">
-                  Grace Period (Minutes) *
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    max="120"
-                    required
-                    value={gracePeriod}
-                    onChange={(e) => {
-                      setGracePeriod(parseInt(e.target.value) || 0);
-                      if (mainErrors.graceMin) setMainErrors((p) => { const n = { ...p }; delete n.graceMin; return n; });
-                    }}
-                    className={`w-24 px-3 py-1.5 bg-white border rounded-lg text-xs font-bold text-slate-900 font-mono ${
-                      mainErrors.graceMin ? 'border-rose-500' : 'border-slate-300'
-                    }`}
-                  />
-                  <span className="text-xs text-slate-600 font-medium">Minutes Buffer (Standard: 15 min)</span>
+                <div>
+                  <label className="block text-slate-800 font-bold uppercase tracking-wider text-[10px] mb-1">
+                    Grace Period (Minutes) *
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="120"
+                      required
+                      value={gracePeriod}
+                      onChange={(e) => {
+                        setGracePeriod(parseInt(e.target.value) || 0);
+                        if (mainErrors.graceMin) setMainErrors((p) => { const n = { ...p }; delete n.graceMin; return n; });
+                      }}
+                      className={`w-24 px-3 py-1.5 bg-white border rounded-lg text-xs font-bold text-slate-900 font-mono ${mainErrors.graceMin ? 'border-rose-500' : 'border-slate-300'
+                        }`}
+                    />
+                    <span className="text-xs text-slate-600 font-medium">Minutes Buffer (Standard: 15 min)</span>
+                  </div>
+                  {mainErrors.graceMin ? (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 block">{mainErrors.graceMin}</span>
+                  ) : (
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Buffer time before triggering excess break alert notifications.
+                    </p>
+                  )}
                 </div>
-                {mainErrors.graceMin ? (
-                  <span className="text-[10px] text-rose-600 font-semibold mt-1 block">{mainErrors.graceMin}</span>
-                ) : (
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Buffer time before triggering excess break alert notifications.
-                  </p>
-                )}
+
+                {/* Excess Break Calculation Pill */}
+                <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-900">
+                    Excess Break Alert Threshold:
+                  </span>
+                  <span className="text-xs font-mono font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                    {excessBreakThreshold} minutes
+                  </span>
+                </div>
               </div>
 
-              {/* Excess Break Calculation Pill */}
-              <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between">
-                <span className="text-xs font-bold text-amber-900">
-                  Excess Break Alert Threshold:
-                </span>
-                <span className="text-xs font-mono font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
-                  {excessBreakThreshold} minutes
+              <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
+                <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <span>
+                  <strong>Automatic Alert Rule:</strong> Any employee whose total break duration exceeds <strong>{excessBreakThreshold} minutes</strong> will immediately trigger the high-priority banner on the Live Attendance Dashboard.
                 </span>
               </div>
-            </div>
-
-            <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
-              <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-              <span>
-                <strong>Automatic Alert Rule:</strong> Any employee whose total break duration exceeds <strong>{excessBreakThreshold} minutes</strong> will immediately trigger the high-priority banner on the Live Attendance Dashboard.
-              </span>
             </div>
           </div>
-        </div>
 
-        {/* Submit Button */}
-        <div className="flex justify-end pt-2">
-          <button
-            type="submit"
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold rounded-xl text-xs sm:text-sm shadow-md shadow-indigo-950/20 transition cursor-pointer"
-          >
-            <Save className="w-4 h-4" />
-            <span>Save & Apply Calibration to {officeName}</span>
-          </button>
-        </div>
-      </form>
+          {/* Submit Button */}
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold rounded-xl text-xs sm:text-sm shadow-md shadow-indigo-950/20 transition cursor-pointer"
+            >
+              <Save className="w-4 h-4" />
+              <span>Save & Apply Calibration to {officeName}</span>
+            </button>
+          </div>
+        </form>
       )}
 
       {/* ========================================================================= */}
@@ -1124,9 +1111,8 @@ export const GeofenceCalibration: React.FC = () => {
                       if (modalErrors.name) setModalErrors((p) => { const n = { ...p }; delete n.name; return n; });
                     }}
                     placeholder="e.g. Tripura Jal Board - Headquarters"
-                    className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
-                      modalErrors.name ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${modalErrors.name ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                      }`}
                   />
                   {modalErrors.name && (
                     <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
@@ -1150,9 +1136,8 @@ export const GeofenceCalibration: React.FC = () => {
                       if (modalErrors.code) setModalErrors((p) => { const n = { ...p }; delete n.code; return n; });
                     }}
                     placeholder="e.g. TJB"
-                    className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg text-xs font-bold uppercase font-mono tracking-wider focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
-                      modalErrors.code ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg text-xs font-bold uppercase font-mono tracking-wider focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${modalErrors.code ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                      }`}
                   />
                   {modalErrors.code ? (
                     <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
@@ -1182,9 +1167,8 @@ export const GeofenceCalibration: React.FC = () => {
                       if (modalErrors.locality) setModalErrors((p) => { const n = { ...p }; delete n.locality; return n; });
                     }}
                     placeholder="e.g. Sakuntala Road / Sector 4"
-                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
-                      modalErrors.locality ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${modalErrors.locality ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                      }`}
                   />
                   {modalErrors.locality && (
                     <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
@@ -1207,9 +1191,8 @@ export const GeofenceCalibration: React.FC = () => {
                       if (modalErrors.city) setModalErrors((p) => { const n = { ...p }; delete n.city; return n; });
                     }}
                     placeholder="e.g. Agartala"
-                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
-                      modalErrors.city ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${modalErrors.city ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                      }`}
                   />
                   {modalErrors.city && (
                     <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
@@ -1232,9 +1215,8 @@ export const GeofenceCalibration: React.FC = () => {
                       if (modalErrors.state) setModalErrors((p) => { const n = { ...p }; delete n.state; return n; });
                     }}
                     placeholder="e.g. Tripura"
-                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
-                      modalErrors.state ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${modalErrors.state ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                      }`}
                   />
                   {modalErrors.state && (
                     <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
@@ -1260,9 +1242,8 @@ export const GeofenceCalibration: React.FC = () => {
                       if (modalErrors.pin) setModalErrors((p) => { const n = { ...p }; delete n.pin; return n; });
                     }}
                     placeholder="e.g. 7990001"
-                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
-                      modalErrors.pin ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${modalErrors.pin ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                      }`}
                   />
                   {modalErrors.pin ? (
                     <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
@@ -1296,11 +1277,10 @@ export const GeofenceCalibration: React.FC = () => {
 
                 {gpsModalStatus && (
                   <div
-                    className={`mb-2 p-2 rounded-lg text-[11px] flex items-center gap-1.5 font-medium ${
-                      gpsModalStatus.type === 'success'
-                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                        : 'bg-rose-50 text-rose-800 border border-rose-200'
-                    }`}
+                    className={`mb-2 p-2 rounded-lg text-[11px] flex items-center gap-1.5 font-medium ${gpsModalStatus.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-800 border border-rose-200'
+                      }`}
                   >
                     {gpsModalStatus.type === 'success' ? (
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
@@ -1326,9 +1306,8 @@ export const GeofenceCalibration: React.FC = () => {
                         if (modalErrors.lat) setModalErrors((p) => { const n = { ...p }; delete n.lat; return n; });
                       }}
                       placeholder="e.g. 23.831500"
-                      className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
-                        modalErrors.lat ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                      }`}
+                      className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${modalErrors.lat ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                        }`}
                     />
                     {modalErrors.lat && (
                       <span className="text-[10px] text-rose-600 font-semibold mt-1 block">{modalErrors.lat}</span>
@@ -1349,9 +1328,8 @@ export const GeofenceCalibration: React.FC = () => {
                         if (modalErrors.lng) setModalErrors((p) => { const n = { ...p }; delete n.lng; return n; });
                       }}
                       placeholder="e.g. 91.286800"
-                      className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
-                        modalErrors.lng ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                      }`}
+                      className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${modalErrors.lng ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                        }`}
                     />
                     {modalErrors.lng && (
                       <span className="text-[10px] text-rose-600 font-semibold mt-1 block">{modalErrors.lng}</span>
@@ -1360,80 +1338,58 @@ export const GeofenceCalibration: React.FC = () => {
                 </div>
               </div>
 
-              {/* Separate Geofence Radius, Office Start Time, Office End Time (NO Shift Hours) */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                    Geofence Radius (Meters) *
-                  </label>
-                  <input
-                    type="number"
-                    min="10"
-                    max="50000"
-                    required
-                    value={newRadiusMeters}
-                    onChange={(e) => {
-                      setNewRadiusMeters(parseInt(e.target.value) || 100);
-                      if (modalErrors.radius) setModalErrors((p) => { const n = { ...p }; delete n.radius; return n; });
-                    }}
-                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg font-mono text-xs ${
-                      modalErrors.radius ? 'border-rose-500' : 'border-slate-300'
+              {/* Geofence Radius */}
+              <div>
+                <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
+                  Geofence Radius (Meters) *
+                </label>
+                <input
+                  type="number"
+                  min="10"
+                  max="50000"
+                  required
+                  value={newRadiusMeters}
+                  onChange={(e) => {
+                    setNewRadiusMeters(parseInt(e.target.value) || 100);
+                    if (modalErrors.radius) setModalErrors((p) => { const n = { ...p }; delete n.radius; return n; });
+                  }}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${modalErrors.radius ? 'border-rose-500' : 'border-slate-300'
                     }`}
-                  />
-                  {modalErrors.radius ? (
-                    <span className="text-[10px] text-rose-600 font-semibold mt-0.5 block">{modalErrors.radius}</span>
-                  ) : (
-                    <span className="text-[10px] text-slate-400">Default: 100m</span>
-                  )}
-                </div>
+                />
+                {modalErrors.radius ? (
+                  <span className="text-[10px] text-rose-600 font-semibold mt-0.5 block">{modalErrors.radius}</span>
+                ) : (
+                  <span className="text-[10px] text-slate-400">Default: 100m (Permitted: 10m - 50,000m)</span>
+                )}
+              </div>
 
-                <div>
-                  <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                    Office Start Time *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newOfficeStartTime}
-                    onChange={(e) => {
-                      setNewOfficeStartTime(e.target.value);
-                      if (modalErrors.startTime) setModalErrors((p) => { const n = { ...p }; delete n.startTime; return n; });
-                    }}
-                    placeholder="10:00 AM"
-                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg font-mono text-xs ${
-                      modalErrors.startTime ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                    }`}
-                  />
-                  {modalErrors.startTime ? (
-                    <span className="text-[10px] text-rose-600 font-semibold mt-0.5 block">{modalErrors.startTime}</span>
-                  ) : (
-                    <span className="text-[10px] text-slate-400">e.g. 10:00 AM</span>
-                  )}
-                </div>
+              {/* Office Start Time & End Time with Clock Pickers */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <ClockTimePicker
+                  label="Office Start Time"
+                  value={newOfficeStartTime}
+                  onChange={(display12h, iso) => {
+                    setNewOfficeStartTime(display12h);
+                    setNewOfficeStartTimeIso(iso);
+                    if (modalErrors.startTime) setModalErrors((p) => { const n = { ...p }; delete n.startTime; return n; });
+                  }}
+                  required
+                  error={modalErrors.startTime}
+                  hint="Select hours, minutes, and AM/PM"
+                />
 
-                <div>
-                  <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                    Office End Time *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newOfficeEndTime}
-                    onChange={(e) => {
-                      setNewOfficeEndTime(e.target.value);
-                      if (modalErrors.endTime) setModalErrors((p) => { const n = { ...p }; delete n.endTime; return n; });
-                    }}
-                    placeholder="05:30 PM"
-                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg font-mono text-xs ${
-                      modalErrors.endTime ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
-                    }`}
-                  />
-                  {modalErrors.endTime ? (
-                    <span className="text-[10px] text-rose-600 font-semibold mt-0.5 block">{modalErrors.endTime}</span>
-                  ) : (
-                    <span className="text-[10px] text-slate-400">e.g. 05:30 PM</span>
-                  )}
-                </div>
+                <ClockTimePicker
+                  label="Office End Time"
+                  value={newOfficeEndTime}
+                  onChange={(display12h, iso) => {
+                    setNewOfficeEndTime(display12h);
+                    setNewOfficeEndTimeIso(iso);
+                    if (modalErrors.endTime) setModalErrors((p) => { const n = { ...p }; delete n.endTime; return n; });
+                  }}
+                  required
+                  error={modalErrors.endTime}
+                  hint="Select hours, minutes, and AM/PM"
+                />
               </div>
 
               {/* Separate Break Allowance & Grace Period */}
@@ -1453,9 +1409,8 @@ export const GeofenceCalibration: React.FC = () => {
                       if (modalErrors.breakMin) setModalErrors((p) => { const n = { ...p }; delete n.breakMin; return n; });
                     }}
                     placeholder="60"
-                    className={`w-full px-3 py-2 bg-white border rounded-lg font-mono text-xs ${
-                      modalErrors.breakMin ? 'border-rose-500' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 bg-white border rounded-lg font-mono text-xs ${modalErrors.breakMin ? 'border-rose-500' : 'border-slate-300'
+                      }`}
                   />
                   {modalErrors.breakMin ? (
                     <span className="text-[10px] text-rose-600 font-semibold mt-1 block">{modalErrors.breakMin}</span>
@@ -1479,9 +1434,8 @@ export const GeofenceCalibration: React.FC = () => {
                       if (modalErrors.graceMin) setModalErrors((p) => { const n = { ...p }; delete n.graceMin; return n; });
                     }}
                     placeholder="15"
-                    className={`w-full px-3 py-2 bg-white border rounded-lg font-mono text-xs ${
-                      modalErrors.graceMin ? 'border-rose-500' : 'border-slate-300'
-                    }`}
+                    className={`w-full px-3 py-2 bg-white border rounded-lg font-mono text-xs ${modalErrors.graceMin ? 'border-rose-500' : 'border-slate-300'
+                      }`}
                   />
                   {modalErrors.graceMin ? (
                     <span className="text-[10px] text-rose-600 font-semibold mt-1 block">{modalErrors.graceMin}</span>

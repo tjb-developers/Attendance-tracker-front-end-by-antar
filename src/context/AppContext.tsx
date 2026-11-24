@@ -137,6 +137,66 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+// Convert any time string into an unambiguous ISO-8601 timestamptz string for PostgreSQL
+function toUtcIsoTimestamp(val: any, defaultH = 10, defaultM = 0): string {
+  if (!val) {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `2000-01-01T${pad(defaultH)}:${pad(defaultM)}:00Z`;
+  }
+  const s = String(val).trim();
+  if (s.includes('T')) {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return d.toISOString();
+  }
+  const match = s.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if (match) {
+    let h = parseInt(match[1], 10);
+    const m = match[2] ? parseInt(match[2], 10) : 0;
+    const modifier = match[4] ? match[4].toUpperCase() : null;
+    if (modifier === 'PM' && h < 12) h += 12;
+    if (modifier === 'AM' && h === 12) h = 0;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `2000-01-01T${pad(h)}:${pad(m)}:00Z`;
+  }
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `2000-01-01T${pad(defaultH)}:${pad(defaultM)}:00Z`;
+}
+
+function to12HourDisplay(val: any, defaultH = 10, defaultM = 0, defaultAmPm = 'AM'): string {
+  if (!val) {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(defaultH)}:${pad(defaultM)} ${defaultAmPm}`;
+  }
+  const s = String(val).trim();
+  if (s.includes('T')) {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      let h = d.getUTCHours();
+      const m = d.getUTCMinutes();
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      h = h ? h : 12;
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${pad(h)}:${pad(m)} ${ampm}`;
+    }
+  }
+  const match = s.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if (match) {
+    let h = parseInt(match[1], 10);
+    const m = match[2] ? parseInt(match[2], 10) : 0;
+    let ampm = match[4]?.toUpperCase();
+    if (!ampm) {
+      ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      h = h ? h : 12;
+    }
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(h)}:${pad(m)} ${ampm}`;
+  }
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(defaultH)}:${pad(defaultM)} ${defaultAmPm}`;
+}
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
 
@@ -540,10 +600,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       office_long: Number(officeData.longitude ?? officeData.office_long),
       geofence_radius: Number(officeData.geofence_radius ?? officeData.radius_meters ?? 100),
       radius_meters: Number(officeData.radius_meters ?? officeData.geofence_radius ?? 100),
-      office_start_time: officeData.office_start_time || officeData.shift_start_time || '10:00 AM',
-      shift_start_time: officeData.office_start_time || officeData.shift_start_time || '10:00 AM',
-      office_end_time: officeData.office_end_time || officeData.shift_end_time || '05:30 PM',
-      shift_end_time: officeData.office_end_time || officeData.shift_end_time || '05:30 PM',
+      office_start_time: toUtcIsoTimestamp(officeData.office_start_time || officeData.shift_start_time, 10, 0),
+      shift_start_time: to12HourDisplay(officeData.shift_start_time || officeData.office_start_time, 10, 0, 'AM'),
+      office_end_time: toUtcIsoTimestamp(officeData.office_end_time || officeData.shift_end_time, 17, 30),
+      shift_end_time: to12HourDisplay(officeData.shift_end_time || officeData.office_end_time, 5, 30, 'PM'),
       break_allowence: Number(officeData.break_allowence ?? officeData.break_allowance ?? officeData.standard_break_allowance_minutes ?? 60),
       standard_break_allowance_minutes: Number(officeData.standard_break_allowance_minutes ?? officeData.break_allowance ?? 60),
       office_grace_period: Number(officeData.office_grace_period ?? officeData.grace_period ?? officeData.break_grace_period_minutes ?? 15),
@@ -592,10 +652,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       office_long: Number(data.longitude ?? data.office_long),
       geofence_radius: Number(data.geofence_radius ?? data.radius_meters ?? 100),
       radius_meters: Number(data.radius_meters ?? data.geofence_radius ?? 100),
-      office_start_time: data.office_start_time || data.shift_start_time || '10:00 AM',
-      shift_start_time: data.office_start_time || data.shift_start_time || '10:00 AM',
-      office_end_time: data.office_end_time || data.shift_end_time || '05:30 PM',
-      shift_end_time: data.office_end_time || data.shift_end_time || '05:30 PM',
+      office_start_time: toUtcIsoTimestamp(data.office_start_time || data.shift_start_time, 10, 0),
+      shift_start_time: to12HourDisplay(data.shift_start_time || data.office_start_time, 10, 0, 'AM'),
+      office_end_time: toUtcIsoTimestamp(data.office_end_time || data.shift_end_time, 17, 30),
+      shift_end_time: to12HourDisplay(data.shift_end_time || data.office_end_time, 5, 30, 'PM'),
       break_allowence: Number(data.break_allowence ?? data.break_allowance ?? data.standard_break_allowance_minutes ?? 60),
       standard_break_allowance_minutes: Number(data.standard_break_allowance_minutes ?? data.break_allowance ?? 60),
       office_grace_period: Number(data.office_grace_period ?? data.grace_period ?? data.break_grace_period_minutes ?? 15),
