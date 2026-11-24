@@ -239,12 +239,12 @@ export const GeofenceCalibration: React.FC = () => {
       errs.state = 'State must be at least 2 characters.';
     }
 
-    // Strict PIN validation: support 7-digit PIN (as requested by user) and 6-digit PIN
+    // Strict 6-digit PIN validation
     const pinStr = String(data.pin).trim();
     if (!pinStr) {
       errs.pin = 'Office Area PIN is required.';
-    } else if (!/^\d{6,7}$/.test(pinStr)) {
-      errs.pin = 'PIN must be a valid 6 or 7-digit number (e.g. 7990001 or 799001).';
+    } else if (!/^\d{6}$/.test(pinStr)) {
+      errs.pin = 'PIN must be exactly a 6-digit number (e.g. 799001).';
     }
 
     const latNum = typeof data.lat === 'number' ? data.lat : parseFloat(data.lat);
@@ -767,20 +767,20 @@ export const GeofenceCalibration: React.FC = () => {
 
                 <div>
                   <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                    Office Area PIN (7 Digits) *
+                    Office Area PIN (6 Digits) *
                   </label>
                   <input
                     type="text"
                     inputMode="numeric"
                     required
-                    maxLength={7}
+                    maxLength={6}
                     value={officePin}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 7);
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 6);
                       setOfficePin(val);
                       if (mainErrors.pin) setMainErrors((p) => { const n = { ...p }; delete n.pin; return n; });
                     }}
-                    placeholder="e.g. 7990001"
+                    placeholder="e.g. 799001"
                     className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${mainErrors.pin ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
                       }`}
                   />
@@ -791,7 +791,7 @@ export const GeofenceCalibration: React.FC = () => {
                     </span>
                   ) : (
                     <span className="text-[10px] text-slate-400 mt-1 block">
-                      Must be exactly 7 digits (e.g. <strong>7990001</strong>)
+                      Must be exactly 6 digits (e.g. <strong>799001</strong>)
                     </span>
                   )}
                 </div>
@@ -1228,20 +1228,20 @@ export const GeofenceCalibration: React.FC = () => {
 
                 <div>
                   <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                    Office Area PIN (7 Digits) *
+                    Office Area PIN (6 Digits) *
                   </label>
                   <input
                     type="text"
                     inputMode="numeric"
                     required
-                    maxLength={7}
+                    maxLength={6}
                     value={newOfficePin}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 7);
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 6);
                       setNewOfficePin(val);
                       if (modalErrors.pin) setModalErrors((p) => { const n = { ...p }; delete n.pin; return n; });
                     }}
-                    placeholder="e.g. 7990001"
+                    placeholder="e.g. 799001"
                     className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${modalErrors.pin ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
                       }`}
                   />
@@ -1252,7 +1252,7 @@ export const GeofenceCalibration: React.FC = () => {
                     </span>
                   ) : (
                     <span className="text-[10px] text-slate-400 mt-1 block">
-                      Must be exactly 7 digits (e.g. <strong>7990001</strong>)
+                      Must be exactly 6 digits (e.g. <strong>799001</strong>)
                     </span>
                   )}
                 </div>
