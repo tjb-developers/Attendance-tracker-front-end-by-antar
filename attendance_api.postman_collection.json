@@ -1,0 +1,198 @@
+{
+  "info": {
+    "_postman_id": "attendance-admin-api-v21",
+    "name": "Attendance Admin API",
+    "description": "Collection for Attendance Super Admin & Admin REST API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. POST Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"superadmin@gov.in\",\n  \"password\": \"12345678\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://192.168.0.130:8000/api/v1/auth/login",
+          "protocol": "http",
+          "host": [
+            "192",
+            "168",
+            "0",
+            "130"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "2. GET Auth Me (Profile)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer YOUR_JWT_TOKEN"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://192.168.0.130:8000/api/v1/auth/me",
+          "protocol": "http",
+          "host": [
+            "192",
+            "168",
+            "0",
+            "130"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "me"
+          ]
+        }
+      }
+    },
+    {
+      "name": "3. GET Employees",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer YOUR_JWT_TOKEN"
+          }
+        ],
+        "url": {
+          "raw": "http://192.168.0.130:8000/api/v1/employees",
+          "protocol": "http",
+          "host": [
+            "192",
+            "168",
+            "0",
+            "130"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "employees"
+          ]
+        }
+      }
+    },
+    {
+      "name": "4. GET Offices",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer YOUR_JWT_TOKEN"
+          }
+        ],
+        "url": {
+          "raw": "http://192.168.0.130:8000/api/v1/offices",
+          "protocol": "http",
+          "host": [
+            "192",
+            "168",
+            "0",
+            "130"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "offices"
+          ]
+        }
+      }
+    },
+    {
+      "name": "5. GET Attendance Sessions",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer YOUR_JWT_TOKEN"
+          }
+        ],
+        "url": {
+          "raw": "http://192.168.0.130:8000/api/v1/attendance/sessions",
+          "protocol": "http",
+          "host": [
+            "192",
+            "168",
+            "0",
+            "130"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "attendance",
+            "sessions"
+          ]
+        }
+      }
+    },
+    {
+      "name": "6. GET Holidays",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer YOUR_JWT_TOKEN"
+          }
+        ],
+        "url": {
+          "raw": "http://192.168.0.130:8000/api/v1/holidays",
+          "protocol": "http",
+          "host": [
+            "192",
+            "168",
+            "0",
+            "130"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "holidays"
+          ]
+        }
+      }
+    }
+  ]
+}

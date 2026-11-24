@@ -1,0 +1,630 @@
+================================================================================
+ATTENDANCE TRACKER BY TJB - TRIPURA JAL BOARD ATTENDANCE SYSTEM
+SUPER ADMIN REST API SPECIFICATION & INTEGRATION REQUIREMENTS CONTRACT
+================================================================================
+
+TO: Backend Engineering Team
+FROM: IT Team, TJB (Frontend Engineering)
+DATE: 2026-11-23
+SUBJECT: Comprehensive Super Admin REST API Specification (Endpoints, Parameters,
+         Payload Schemas, Response Envelopes & Database Migration Script)
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1. GLOBAL ARCHITECTURE & API CONVENTIONS
+2. AUTHENTICATION & SESSION MANAGEMENT APIS
+3. OFFICE & GEOFENCE CALIBRATION APIS (MULTIPLE OFFICES SUPPORT)
+4. ANNUAL GOVERNMENT HOLIDAY CALENDAR APIS
+5. BRANCH ADMIN PROVISIONING & ASSIGNMENT APIS
+6. GLOBAL ATTENDANCE SESSIONS & SUPER ADMIN OVERRIDES
+7. GLOBAL LEAVE & OUT-DUTY VERIFICATION OVERSIGHT
+8. ATTENDANCE CORRECTIONS DESK APIS
+9. SYSTEM AUDIT TRAIL APIS
+10. COMPLETE POSTGRESQL / SUPABASE DATABASE SCHEMA & SEED SCRIPT
+
+================================================================================
+1. GLOBAL ARCHITECTURE & API CONVENTIONS
+================================================================================
+- Frontend Base URL Configuration (.env):
+    VITE_API_BASE_URL=http://localhost:8000/api/v1  (or production API server)
+- Transport & Format: HTTPS (TLS 1.3), Content-Type: application/json
+- Authentication:
+    Authorization: Bearer <jwt_access_token>
+- Standard Success Envelope (HTTP 200 / 201):
+    {
+      "success": true,
+      "data": { ... } | [ ... ],
+      "message": "Human-readable action status confirmation"
+    }
+- Standard Error Envelope (HTTP 4xx / 5xx):
+    {
+      "success": false,
+      "error": "Detailed error reason string"
+    }
+- Role Requirement: All endpoints below strictly require the authenticated user 
+  to possess role: 'super_admin' (HTTP 403 Forbidden if called by 'admin' or 'employee').
+
+================================================================================
+2. AUTHENTICATION & SESSION MANAGEMENT APIS
+================================================================================
+
+--------------------------------------------------------------------------------
+2.1. ADMINISTRATOR LOGIN
+--------------------------------------------------------------------------------
+- Method: POST
+- Path: /api/v1/auth/login
+- Access: Public
+- Request Headers:
+    Content-Type: application/json
+- Request Body (JSON):
+    {
+      "email": "superadmin@tripurajalboard.gov.in",                 // (string, required)
+      "password": "SuperAdminSecurePassword123#"                   // (string, required)
+    }
+- Success Response (HTTP 200 OK):
+    {
+      "success": true,
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "user": {
+        "id": "usr-super-01",
+        "email": "superadmin@tripurajalboard.gov.in",
+        "full_name": "Biplab Debbarma",
+        "role": "super_admin",
+        "status": "active",
+        "assigned_office_ids": []
+      }
+    }
+- Error Responses:
+    - 400 Bad Request: Missing email or password.
+    - 401 Unauthorized: Invalid credentials or account suspended.
+    - 403 Forbidden: If an employee tries to log in to this web panel.
+
+--------------------------------------------------------------------------------
+2.2. GET CURRENT PROFILE (/auth/me)
+--------------------------------------------------------------------------------
+- Method: GET
+- Path: /api/v1/auth/me
+- Headers: Authorization: Bearer <token>
+- Success Response (HTTP 200 OK):
+    {
+      "success": true,
+      "user": {
+        "id": "usr-super-01",
+        "email": "superadmin@tripurajalboard.gov.in",
+        "full_name": "Biplab Debbarma",
+        "role": "super_admin",
+        "status": "active",
+        "assigned_office_ids": []
+      }
+    }
+
+--------------------------------------------------------------------------------
+2.3. LOGOUT
+--------------------------------------------------------------------------------
+- Method: POST
+- Path: /api/v1/auth/logout
+- Headers: Authorization: Bearer <token>
+- Success Response (HTTP 200 OK):
+    { "success": true, "message": "Successfully logged out." }
+
+================================================================================
+3. OFFICE & GEOFENCE CALIBRATION APIS (MULTIPLE OFFICES SUPPORT)
+================================================================================
+
+--------------------------------------------------------------------------------
+3.1. CREATE NEW OFFICE / DIVISION
+--------------------------------------------------------------------------------
+- Method: POST
+- Path: /api/v1/offices
+- Headers: Authorization: Bearer <super_admin_token>
+- Description: Allows Super Admin to register any new office/branch. The latitude
+  and longitude can be entered manually or fetched via device GPS on premises.
+- Request Body (JSON):
+    {
+      "office_name": "Tripura Jal Board - Belonia Division",         // (string, required)
+      "address": "Court Road, Sub-divisional Complex, Belonia 799155",// (string, required)
+      "latitude": 23.251400,                                        // (number, required, decimal up to 6 places)
+      "longitude": 91.455200,                                       // (number, required, decimal up to 6 places)
+      "radius_meters": 100,                                         // (number, required, default: 100)
+      "time_zone": "Asia/Kolkata",                                  // (string, optional, default: "Asia/Kolkata")
+      "working_days": [1, 2, 3, 4, 5, 6],                           // (array of integers, 1=Mon .. 6=Sat)
+      "standard_break_allowance_minutes": 60,                       // (number, required, default: 60)
+      "break_grace_period_minutes": 15,                             // (number, required, default: 15)
+      "shift_start_time": "10:00 AM",                               // (string, required, default: "10:00 AM")
+      "shift_end_time": "05:30 PM"                                  // (string, required, default: "05:30 PM")
+    }
+- Success Response (HTTP 201 Created):
+    {
+      "success": true,
+      "data": {
+        "id": "office-belonia-01",
+        "office_name": "Tripura Jal Board - Belonia Division",
+        "address": "Court Road, Sub-divisional Complex, Belonia 799155",
+        "latitude": 23.251400,
+        "longitude": 91.455200,
+        "radius_meters": 100,
+        "standard_break_allowance_minutes": 60,
+        "break_grace_period_minutes": 15,
+        "shift_start_time": "10:00 AM",
+        "shift_end_time": "05:30 PM",
+        "created_at": "2026-11-23T10:00:00Z"
+      }
+    }
+
+--------------------------------------------------------------------------------
+3.2. LIST ALL OFFICES
+--------------------------------------------------------------------------------
+- Method: GET
+- Path: /api/v1/offices
+- Query Parameters:
+    - status: (optional, string: 'active' | 'suspended')
+- Success Response (HTTP 200 OK):
+    {
+      "success": true,
+      "data": [
+        {
+          "id": "office-agartala-hq",
+          "office_name": "Tripura Jal Board - Agartala Headquarters",
+          "address": "Sakuntala Rd, Sadar, Agartala, Tripura 799001",
+          "latitude": 23.831500,
+          "longitude": 91.286800,
+          "radius_meters": 100,
+          "standard_break_allowance_minutes": 60,
+          "break_grace_period_minutes": 15,
+          "shift_start_time": "10:00 AM",
+          "shift_end_time": "05:30 PM",
+          "created_at": "2026-01-01T00:00:00Z"
+        }
+      ]
+    }
+
+--------------------------------------------------------------------------------
+3.3. GET OFFICE BY ID
+--------------------------------------------------------------------------------
+- Method: GET
+- Path: /api/v1/offices/:id
+- Path Parameter: id (UUID of the office)
+- Success Response (HTTP 200 OK): Single office object.
+
+--------------------------------------------------------------------------------
+3.4. UPDATE / CALIBRATE OFFICE GEOFENCE & SHIFT POLICY
+--------------------------------------------------------------------------------
+- Method: PUT
+- Path: /api/v1/offices/:id/calibration
+- Path Parameter: id (UUID of the office)
+- Headers: Authorization: Bearer <super_admin_token>
+- Description: Calibrates GPS geofence circle and shift hours enforced by mobile app.
+- Request Body (JSON):
+    {
+      "office_name": "Tripura Jal Board - Agartala Headquarters",
+      "address": "Sakuntala Rd, Sadar, Agartala, Tripura 799001",
+      "latitude": 23.831500,
+      "longitude": 91.286800,
+      "radius_meters": 100,
+      "shift_start_time": "10:00 AM",
+      "shift_end_time": "05:30 PM",
+      "standard_break_allowance_minutes": 60,
+      "break_grace_period_minutes": 15
+    }
+- Business Logic:
+    - Mobile app computes Euclidean/Haversine distance from this (latitude, longitude).
+    - If distance > radius_meters, mobile app blocks biometric check-in.
+    - Excess Break Alert is calculated as: standard_break_allowance_minutes + break_grace_period_minutes (e.g. 60 + 15 = 75 min).
+- Success Response (HTTP 200 OK):
+    {
+      "success": true,
+      "message": "Office geofence calibration updated successfully."
+    }
+
+--------------------------------------------------------------------------------
+3.5. DELETE / DEACTIVATE OFFICE
+--------------------------------------------------------------------------------
+- Method: DELETE
+- Path: /api/v1/offices/:id
+- Success Response (HTTP 200 OK):
+    { "success": true, "message": "Office removed successfully." }
+
+================================================================================
+4. ANNUAL GOVERNMENT HOLIDAY CALENDAR APIS
+================================================================================
+
+--------------------------------------------------------------------------------
+4.1. ADD GOVERNMENT HOLIDAY
+--------------------------------------------------------------------------------
+- Method: POST
+- Path: /api/v1/holidays
+- Headers: Authorization: Bearer <super_admin_token>
+- Description: Allows Super Admin to declare an official state or local holiday.
+- Request Body (JSON):
+    {
+      "holiday_name": "Garia Puja",                                 // (string, required)
+      "holiday_date": "2026-04-21",                                 // (string, required, YYYY-MM-DD)
+      "end_date": null,                                             // (string, optional, for multi-day pujas e.g. "2026-10-21")
+      "year": 2026,                                                 // (integer, required)
+      "holiday_type": "state_declared",                             // (string: 'gazetted' | 'state_declared' | 'restricted' | 'local_festival')
+      "office_id": null,                                            // (string | null, null = All Offices / Statewide)
+      "description": "Traditional Indigenous Festival of Tripura"   // (string, optional)
+    }
+- Success Response (HTTP 201 Created):
+    {
+      "success": true,
+      "data": {
+        "id": "hol-uuid-101",
+        "holiday_name": "Garia Puja",
+        "holiday_date": "2026-04-21",
+        "end_date": null,
+        "year": 2026,
+        "holiday_type": "state_declared",
+        "office_id": null,
+        "description": "Traditional Indigenous Festival of Tripura",
+        "created_at": "2026-11-23T10:30:00Z"
+      }
+    }
+
+--------------------------------------------------------------------------------
+4.2. GET HOLIDAYS LIST
+--------------------------------------------------------------------------------
+- Method: GET
+- Path: /api/v1/holidays
+- Query Parameters:
+    - year: (optional, integer, e.g. 2026)
+    - office_id: (optional, string, filter for holidays applicable to a branch)
+- Success Response (HTTP 200 OK):
+    {
+      "success": true,
+      "data": [
+        {
+          "id": "hol-uuid-101",
+          "holiday_name": "Republic Day",
+          "holiday_date": "2026-01-26",
+          "end_date": null,
+          "year": 2026,
+          "holiday_type": "gazetted",
+          "office_id": null,
+          "description": "National Gazetted Public Holiday"
+        }
+      ]
+    }
+
+--------------------------------------------------------------------------------
+4.3. UPDATE HOLIDAY
+--------------------------------------------------------------------------------
+- Method: PUT
+- Path: /api/v1/holidays/:id
+- Path Parameter: id (UUID of holiday)
+- Request Body (JSON): Partial holiday fields.
+- Success Response (HTTP 200 OK):
+    { "success": true, "message": "Holiday updated successfully." }
+
+--------------------------------------------------------------------------------
+4.4. DELETE HOLIDAY
+--------------------------------------------------------------------------------
+- Method: DELETE
+- Path: /api/v1/holidays/:id
+- Success Response (HTTP 200 OK):
+    { "success": true, "message": "Holiday deleted from calendar." }
+
+================================================================================
+5. BRANCH ADMIN PROVISIONING & ASSIGNMENT APIS
+================================================================================
+
+--------------------------------------------------------------------------------
+5.1. PROVISION NEW BRANCH ADMIN
+--------------------------------------------------------------------------------
+- Method: POST
+- Path: /api/v1/admins
+- Headers: Authorization: Bearer <super_admin_token>
+- Request Body (JSON):
+    {
+      "full_name": "Poulami Chakraborty",                          // (string, required)
+      "email": "admin.agartala@tripurajalboard.gov.in",             // (string, required, unique)
+      "password": "SecurePassword123#",                            // (string, required, min 8 chars)
+      "role": "admin",                                              // ('admin' | 'super_admin')
+      "assigned_office_ids": ["office-agartala-hq"]                 // (array of UUIDs; empty array = all offices)
+    }
+- Success Response (HTTP 201 Created):
+    {
+      "success": true,
+      "data": {
+        "id": "usr-admin-01",
+        "full_name": "Poulami Chakraborty",
+        "email": "admin.agartala@tripurajalboard.gov.in",
+        "role": "admin",
+        "status": "active",
+        "assigned_office_ids": ["office-agartala-hq"],
+        "created_at": "2026-11-23T11:00:00Z"
+      }
+    }
+
+--------------------------------------------------------------------------------
+5.2. LIST ALL ADMINS
+--------------------------------------------------------------------------------
+- Method: GET
+- Path: /api/v1/admins
+- Success Response (HTTP 200 OK): Array of all admin profiles with status and assigned office IDs.
+
+--------------------------------------------------------------------------------
+5.3. UPDATE ADMIN PROFILE & ASSIGNED OFFICES
+--------------------------------------------------------------------------------
+- Method: PUT
+- Path: /api/v1/admins/:id
+- Path Parameter: id (UUID of admin)
+- Request Body (JSON):
+    {
+      "full_name": "Poulami Chakraborty",
+      "assigned_office_ids": ["office-agartala-hq", "office-dharmanagar"]
+    }
+- Success Response (HTTP 200 OK)
+
+--------------------------------------------------------------------------------
+5.4. ACTIVATE / SUSPEND ADMIN
+--------------------------------------------------------------------------------
+- Method: PATCH
+- Path: /api/v1/admins/:id/status
+- Request Body (JSON):
+    {
+      "status": "suspended" // or "active"
+    }
+- Success Response (HTTP 200 OK)
+
+================================================================================
+6. GLOBAL ATTENDANCE SESSIONS & SUPER ADMIN OVERRIDES
+================================================================================
+
+--------------------------------------------------------------------------------
+6.1. QUERY ALL ATTENDANCE SESSIONS (GLOBAL)
+--------------------------------------------------------------------------------
+- Method: GET
+- Path: /api/v1/attendance/sessions
+- Query Parameters:
+    - office_id: (optional, string: 'all' or specific office UUID)
+    - date: (optional, YYYY-MM-DD, default: today)
+    - status: (optional, 'working' | 'on_break' | 'on_official_work' | 'checked_out')
+    - search: (optional, string, searches employee name / code)
+- Success Response (HTTP 200 OK): Array of session records with nested employee objects.
+
+--------------------------------------------------------------------------------
+6.2. FORCE OVERRIDE ATTENDANCE SESSION (SUPER ADMIN ONLY)
+--------------------------------------------------------------------------------
+- Method: PUT
+- Path: /api/v1/attendance/sessions/:id/override
+- Path Parameter: id (UUID of attendance session)
+- Headers: Authorization: Bearer <super_admin_token>
+- Description: Allows Super Admin to directly adjust session timestamps, status, 
+  break minutes, or confirmed working minutes with mandatory audit remark.
+- Request Body (JSON):
+    {
+      "check_in_time": "2026-11-23T10:00:00+05:30",                // (string, ISO timestamp)
+      "check_out_time": "2026-11-23T17:30:00+05:30",               // (string | null, ISO timestamp)
+      "active_status": "checked_out",                               // ('working' | 'on_break' | 'on_official_work' | 'checked_out')
+      "confirmed_working_minutes": 420,                             // (integer)
+      "actual_break_minutes": 30,                                  // (integer)
+      "admin_remarks": "Adjusted check-in timestamp per verified executive order." // (string, MANDATORY)
+    }
+- Business Rules:
+    - The backend MUST write an entry into the audit_logs table recording the 
+      super admin's user ID, old values, new values, and admin_remarks.
+- Success Response (HTTP 200 OK):
+    {
+      "success": true,
+      "message": "Attendance session overridden and audit remark recorded."
+    }
+
+================================================================================
+7. GLOBAL LEAVE & OUT-DUTY VERIFICATION OVERSIGHT
+================================================================================
+
+--------------------------------------------------------------------------------
+7.1. LEAVE APPROVAL DESK
+--------------------------------------------------------------------------------
+- GET /api/v1/leaves?office_id=...&status=pending
+- POST /api/v1/leaves/:id/approve
+    Request Body: { "remarks": "Approved by Administrator" }
+- POST /api/v1/leaves/:id/reject
+    Request Body: { "rejection_reason": "Insufficient leave balance" } // MANDATORY
+
+--------------------------------------------------------------------------------
+7.2. OFFICE OUT DUTY DESK
+--------------------------------------------------------------------------------
+- GET /api/v1/official-duties?office_id=...&status=pending
+- POST /api/v1/official-duties/:id/approve
+    Business Rule: Converts duration_minutes of the out duty into confirmed_working_minutes 
+    on the employee's active attendance session.
+    Request Body: { "remarks": "Verified duty at pump house." }
+- POST /api/v1/official-duties/:id/reject
+    Request Body: { "rejection_reason": "Destination unverified" } // MANDATORY
+
+================================================================================
+8. ATTENDANCE CORRECTIONS DESK APIS
+================================================================================
+- GET /api/v1/attendance/corrections?office_id=...&status=pending
+- POST /api/v1/attendance/corrections/:id/approve
+    Business Rule: Applies requested_check_in and requested_check_out timestamps 
+    to the target attendance session.
+    Request Body: { "remarks": "Correction approved" }
+- POST /api/v1/attendance/corrections/:id/reject
+    Request Body: { "rejection_reason": "Discrepancy in gate log" } // MANDATORY
+
+================================================================================
+9. SYSTEM AUDIT TRAIL APIS
+================================================================================
+- Method: GET
+- Path: /api/v1/audit-logs
+- Headers: Authorization: Bearer <super_admin_token>
+- Query Parameters:
+    - action: (optional, e.g., 'GEOFENCE_CALIBRATION_UPDATE', 'SUPER_ADMIN_SESSION_OVERRIDE')
+    - entity: (optional, e.g., 'offices', 'attendance_sessions', 'holidays', 'admins')
+    - limit: (optional, integer, default: 100)
+- Success Response (HTTP 200 OK):
+    {
+      "success": true,
+      "data": [
+        {
+          "id": "log-001",
+          "user_id": "usr-super-01",
+          "user_name": "Biplab Debbarma",
+          "user_email": "superadmin@tripurajalboard.gov.in",
+          "action": "GEOFENCE_CALIBRATION_UPDATE",
+          "entity": "offices",
+          "entity_id": "office-agartala-hq",
+          "payload": { "radius_meters": 100, "excess_break_threshold": 75 },
+          "ip_address": "10.12.4.21",
+          "created_at": "2026-11-22T10:15:00Z"
+        }
+      ]
+    }
+
+================================================================================
+10. COMPLETE POSTGRESQL / SUPABASE DATABASE SCHEMA & SEED SCRIPT
+================================================================================
+Run the following SQL script to set up all tables and seed the initial Super Admin:
+
+```sql
+-- 1. PROFILES TABLE (Supabase auth.users extension or standalone profiles)
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email VARCHAR(255) UNIQUE NOT NULL,
+  full_name VARCHAR(255) NOT NULL,
+  role VARCHAR(50) NOT NULL CHECK (role IN ('super_admin', 'admin', 'employee')),
+  status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'inactive')),
+  assigned_office_ids TEXT[] DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2. OFFICES TABLE
+CREATE TABLE IF NOT EXISTS offices (
+  id VARCHAR(100) PRIMARY KEY,
+  office_name VARCHAR(255) NOT NULL,
+  address TEXT NOT NULL,
+  latitude DOUBLE PRECISION NOT NULL,
+  longitude DOUBLE PRECISION NOT NULL,
+  radius_meters INT NOT NULL DEFAULT 100,
+  time_zone VARCHAR(100) DEFAULT 'Asia/Kolkata',
+  working_days INT[] DEFAULT '{1,2,3,4,5,6}',
+  standard_break_allowance_minutes INT DEFAULT 60,
+  break_grace_period_minutes INT DEFAULT 15,
+  shift_start_time VARCHAR(20) DEFAULT '10:00 AM',
+  shift_end_time VARCHAR(20) DEFAULT '05:30 PM',
+  status VARCHAR(50) DEFAULT 'active',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 3. ANNUAL HOLIDAYS TABLE
+CREATE TABLE IF NOT EXISTS holidays (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  holiday_name VARCHAR(255) NOT NULL,
+  holiday_date DATE NOT NULL,
+  end_date DATE,
+  year INT NOT NULL,
+  holiday_type VARCHAR(50) DEFAULT 'gazetted' CHECK (holiday_type IN ('gazetted', 'state_declared', 'restricted', 'local_festival')),
+  office_id VARCHAR(100) REFERENCES offices(id) ON DELETE SET NULL,
+  description TEXT,
+  created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 4. EMPLOYEES TABLE (Enrolled by Admins only)
+CREATE TABLE IF NOT EXISTS employees (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_code VARCHAR(100) UNIQUE NOT NULL,
+  full_name VARCHAR(255) NOT NULL,
+  designation VARCHAR(255) NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  mobile_number VARCHAR(50) NOT NULL,
+  office_id VARCHAR(100) REFERENCES offices(id),
+  date_of_birth DATE,
+  residential_address TEXT,
+  status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
+  created_by UUID REFERENCES profiles(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 5. ATTENDANCE SESSIONS TABLE
+CREATE TABLE IF NOT EXISTS attendance_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id UUID REFERENCES employees(id) ON DELETE CASCADE,
+  office_id VARCHAR(100) REFERENCES offices(id),
+  attendance_date DATE NOT NULL,
+  check_in_time TIMESTAMP WITH TIME ZONE NOT NULL,
+  check_out_time TIMESTAMP WITH TIME ZONE,
+  active_status VARCHAR(50) DEFAULT 'working',
+  office_working_minutes INT DEFAULT 0,
+  actual_break_minutes INT DEFAULT 0,
+  approved_official_work_minutes INT DEFAULT 0,
+  confirmed_working_minutes INT DEFAULT 0,
+  check_in_latitude DOUBLE PRECISION,
+  check_in_longitude DOUBLE PRECISION,
+  check_in_distance_meters DOUBLE PRECISION,
+  check_out_latitude DOUBLE PRECISION,
+  check_out_longitude DOUBLE PRECISION,
+  check_out_distance_meters DOUBLE PRECISION,
+  is_finalized BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 6. SYSTEM AUDIT LOGS TABLE
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  user_name VARCHAR(255),
+  user_email VARCHAR(255),
+  action VARCHAR(100) NOT NULL,
+  entity VARCHAR(100) NOT NULL,
+  entity_id VARCHAR(100),
+  payload JSONB,
+  ip_address VARCHAR(50),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- =============================================================================
+-- SEED INITIAL DATA: DEFAULT OFFICE & SUPER ADMIN PROFILE
+-- =============================================================================
+
+-- Default Office
+INSERT INTO offices (
+  id, office_name, address, latitude, longitude, radius_meters, 
+  standard_break_allowance_minutes, break_grace_period_minutes, 
+  shift_start_time, shift_end_time, time_zone
+) VALUES (
+  'office-agartala-hq',
+  'Tripura Jal Board - Agartala Headquarters',
+  'Sakuntala Rd, Sadar, Agartala, Tripura 799001',
+  23.8315,
+  91.2868,
+  100,
+  60,
+  15,
+  '10:00 AM',
+  '05:30 PM',
+  'Asia/Kolkata'
+) ON CONFLICT (id) DO NOTHING;
+
+-- Initial Super Admin Profile (Biplab Debbarma)
+INSERT INTO profiles (
+  id,
+  email,
+  full_name,
+  role,
+  status,
+  assigned_office_ids,
+  created_at
+) VALUES (
+  gen_random_uuid(),
+  'superadmin@tripurajalboard.gov.in',
+  'Biplab Debbarma',
+  'super_admin',
+  'active',
+  '{}',
+  NOW()
+) ON CONFLICT (email) DO UPDATE SET role = 'super_admin', status = 'active';
+```
+
+================================================================================
+END OF SPECIFICATION CONTRACT
+================================================================================

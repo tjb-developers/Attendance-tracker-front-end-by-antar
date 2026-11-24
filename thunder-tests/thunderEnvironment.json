@@ -1,0 +1,33 @@
+[
+  {
+    "_id": "env-local",
+    "name": "Localhost Server",
+    "default": false,
+    "variables": [
+      {
+        "name": "baseUrl",
+        "value": "http://localhost:8000/api/v1"
+      },
+      {
+        "name": "token",
+        "value": ""
+      }
+    ]
+  },
+  {
+    "_id": "env-network",
+    "name": "Network Server (192.168.0.130)",
+    "default": true,
+    "variables": [
+      {
+        "name": "baseUrl",
+        "value": "http://192.168.0.130:8000/api/v1"
+      },
+      {
+        "name": "token",
+        "value": ""
+      }
+    ]
+  }
+]
+
