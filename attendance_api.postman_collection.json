@@ -138,6 +138,47 @@
       }
     },
     {
+      "name": "4b. POST Register Office",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer YOUR_JWT_TOKEN"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"office_name\": \"Headquarters Division\",\n  \"office_code\": \"TJB\",\n  \"office_locality\": \"Sakuntala Road, Sadar\",\n  \"office_city\": \"Agartala\",\n  \"office_state\": \"Tripura\",\n  \"office_pin\": 7990001,\n  \"latitude\": 23.8315,\n  \"longitude\": 91.2868,\n  \"geofence_radius\": 100,\n  \"radius_meters\": 100,\n  \"office_start_time\": \"10:00 AM\",\n  \"office_end_time\": \"05:30 PM\",\n  \"break_allowence\": 60,\n  \"standard_break_allowance_minutes\": 60,\n  \"office_grace_period\": 15,\n  \"break_grace_period_minutes\": 15\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://192.168.0.130:8000/api/v1/offices",
+          "protocol": "http",
+          "host": [
+            "192",
+            "168",
+            "0",
+            "130"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "offices"
+          ]
+        }
+      }
+    },
+    {
       "name": "5. GET Attendance Sessions",
       "request": {
         "method": "GET",

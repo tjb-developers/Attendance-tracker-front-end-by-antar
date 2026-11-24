@@ -74,7 +74,9 @@ interface AppContextType {
     officeId: string,
     data: {
       office_name?: string;
+      name?: string;
       office_code?: string;
+      code?: string;
       address?: string;
       locality?: string;
       office_locality?: string;
@@ -82,16 +84,20 @@ interface AppContextType {
       office_city?: string;
       state?: string;
       office_state?: string;
-      pin?: string;
-      office_pin?: string;
+      pin?: string | number;
+      office_pin?: string | number;
       latitude?: number;
+      office_lat?: number;
       longitude?: number;
+      office_long?: number;
       radius_meters?: number;
       geofence_radius?: number;
       standard_break_allowance_minutes?: number;
       break_allowance?: number;
+      break_allowence?: number;
       break_grace_period_minutes?: number;
       grace_period?: number;
+      office_grace_period?: number;
       shift_start_time?: string;
       office_start_time?: string;
       shift_end_time?: string;
@@ -515,8 +521,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return true;
   };
 
-  const addOffice = async (officeData: Omit<Office, 'id' | 'created_at'>): Promise<boolean> => {
-    const res = await officesApi.create(officeData);
+  const addOffice = async (officeData: any): Promise<boolean> => {
+    const rawPin = officeData.office_pin || officeData.pin;
+    const cleanPayload = {
+      office_name: (officeData.office_name || officeData.name || '').trim(),
+      name: (officeData.office_name || officeData.name || '').trim(),
+      office_code: (officeData.office_code || officeData.code || '').trim().toUpperCase(),
+      code: (officeData.office_code || officeData.code || '').trim().toUpperCase(),
+      office_locality: (officeData.office_locality || officeData.locality || '').trim(),
+      office_city: (officeData.office_city || officeData.city || '').trim(),
+      office_state: (officeData.office_state || officeData.state || '').trim(),
+      office_pin: rawPin !== undefined && rawPin !== null && String(rawPin).trim() !== ''
+        ? parseInt(String(rawPin).replace(/\D/g, ''), 10)
+        : undefined,
+      latitude: Number(officeData.latitude ?? officeData.office_lat),
+      office_lat: Number(officeData.latitude ?? officeData.office_lat),
+      longitude: Number(officeData.longitude ?? officeData.office_long),
+      office_long: Number(officeData.longitude ?? officeData.office_long),
+      geofence_radius: Number(officeData.geofence_radius ?? officeData.radius_meters ?? 100),
+      radius_meters: Number(officeData.radius_meters ?? officeData.geofence_radius ?? 100),
+      office_start_time: officeData.office_start_time || officeData.shift_start_time || '10:00 AM',
+      shift_start_time: officeData.office_start_time || officeData.shift_start_time || '10:00 AM',
+      office_end_time: officeData.office_end_time || officeData.shift_end_time || '05:30 PM',
+      shift_end_time: officeData.office_end_time || officeData.shift_end_time || '05:30 PM',
+      break_allowence: Number(officeData.break_allowence ?? officeData.break_allowance ?? officeData.standard_break_allowance_minutes ?? 60),
+      standard_break_allowance_minutes: Number(officeData.standard_break_allowance_minutes ?? officeData.break_allowance ?? 60),
+      office_grace_period: Number(officeData.office_grace_period ?? officeData.grace_period ?? officeData.break_grace_period_minutes ?? 15),
+      break_grace_period_minutes: Number(officeData.break_grace_period_minutes ?? officeData.grace_period ?? 15),
+      address: (officeData.address || `${officeData.office_locality || ''}, ${officeData.office_city || ''}, ${officeData.office_state || ''} - ${rawPin || ''}`).trim(),
+    };
+
+    const res = await officesApi.create(cleanPayload);
     if (res.error) {
       alert(`Failed to create office: ${res.error}`);
       return false;
@@ -537,33 +572,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const updateOfficeCalibration = async (
     officeId: string,
-    data: {
-      office_name?: string;
-      office_code?: string;
-      address?: string;
-      locality?: string;
-      office_locality?: string;
-      city?: string;
-      office_city?: string;
-      state?: string;
-      office_state?: string;
-      pin?: string;
-      office_pin?: string;
-      latitude?: number;
-      longitude?: number;
-      radius_meters?: number;
-      geofence_radius?: number;
-      standard_break_allowance_minutes?: number;
-      break_allowance?: number;
-      break_grace_period_minutes?: number;
-      grace_period?: number;
-      shift_start_time?: string;
-      office_start_time?: string;
-      shift_end_time?: string;
-      office_end_time?: string;
-    }
+    data: any
   ): Promise<boolean> => {
-    const res = await officesApi.updateCalibration(officeId, data);
+    const rawPin = data.office_pin || data.pin;
+    const cleanPayload = {
+      office_name: (data.office_name || data.name || '').trim(),
+      name: (data.office_name || data.name || '').trim(),
+      office_code: (data.office_code || data.code || '').trim().toUpperCase(),
+      code: (data.office_code || data.code || '').trim().toUpperCase(),
+      office_locality: (data.office_locality || data.locality || '').trim(),
+      office_city: (data.office_city || data.city || '').trim(),
+      office_state: (data.office_state || data.state || '').trim(),
+      office_pin: rawPin !== undefined && rawPin !== null && String(rawPin).trim() !== ''
+        ? parseInt(String(rawPin).replace(/\D/g, ''), 10)
+        : undefined,
+      latitude: Number(data.latitude ?? data.office_lat),
+      office_lat: Number(data.latitude ?? data.office_lat),
+      longitude: Number(data.longitude ?? data.office_long),
+      office_long: Number(data.longitude ?? data.office_long),
+      geofence_radius: Number(data.geofence_radius ?? data.radius_meters ?? 100),
+      radius_meters: Number(data.radius_meters ?? data.geofence_radius ?? 100),
+      office_start_time: data.office_start_time || data.shift_start_time || '10:00 AM',
+      shift_start_time: data.office_start_time || data.shift_start_time || '10:00 AM',
+      office_end_time: data.office_end_time || data.shift_end_time || '05:30 PM',
+      shift_end_time: data.office_end_time || data.shift_end_time || '05:30 PM',
+      break_allowence: Number(data.break_allowence ?? data.break_allowance ?? data.standard_break_allowance_minutes ?? 60),
+      standard_break_allowance_minutes: Number(data.standard_break_allowance_minutes ?? data.break_allowance ?? 60),
+      office_grace_period: Number(data.office_grace_period ?? data.grace_period ?? data.break_grace_period_minutes ?? 15),
+      break_grace_period_minutes: Number(data.break_grace_period_minutes ?? data.grace_period ?? 15),
+      address: (data.address || `${data.office_locality || ''}, ${data.office_city || ''}, ${data.office_state || ''} - ${rawPin || ''}`).trim(),
+    };
+
+    const res = await officesApi.updateCalibration(officeId, cleanPayload);
     if (res.error) {
       alert(`Failed to update office calibration: ${res.error}`);
       return false;

@@ -122,7 +122,7 @@ export const officesApi = {
   delete: (id: string) =>
     apiRequest(`/offices/${id}`, { method: 'DELETE' }),
   updateCalibration: (id: string, payload: any) =>
-    apiRequest(`/offices/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+    apiRequest(`/offices/${id}/calibration`, { method: 'PUT', body: JSON.stringify(payload) }),
 };
 
 export const adminsApi = {

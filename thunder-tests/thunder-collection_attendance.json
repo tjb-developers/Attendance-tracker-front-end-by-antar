@@ -1,0 +1,369 @@
+{
+  "client": "Thunder Client",
+  "clientName": "Thunder Client",
+  "collectionName": "Attendance Super Admin & Admin API",
+  "collectionId": "attendance-admin-api-v1",
+  "ref": "attendance-admin-api-v1",
+  "dateExported": "2026-11-24",
+  "version": "1.2",
+  "folders": [
+    {
+      "_id": "folder-auth",
+      "name": "1. Authentication",
+      "containerId": "",
+      "created": "2026-11-24",
+      "sortNum": 10000
+    },
+    {
+      "_id": "folder-employees",
+      "name": "2. Employees Management",
+      "containerId": "",
+      "created": "2026-11-24",
+      "sortNum": 20000
+    },
+    {
+      "_id": "folder-offices",
+      "name": "3. Offices & Geofencing",
+      "containerId": "",
+      "created": "2026-11-24",
+      "sortNum": 30000
+    },
+    {
+      "_id": "folder-attendance",
+      "name": "4. Attendance & Overrides",
+      "containerId": "",
+      "created": "2026-11-24",
+      "sortNum": 40000
+    },
+    {
+      "_id": "folder-leaves",
+      "name": "5. Leave Approvals",
+      "containerId": "",
+      "created": "2026-11-24",
+      "sortNum": 50000
+    },
+    {
+      "_id": "folder-holidays",
+      "name": "6. Holidays Calendar",
+      "containerId": "",
+      "created": "2026-11-24",
+      "sortNum": 60000
+    }
+  ],
+  "requests": [
+    {
+      "_id": "req-login",
+      "colId": "attendance-admin-api-v1",
+      "containerId": "folder-auth",
+      "name": "POST Login (Super Admin / Admin)",
+      "url": "http://192.168.0.130:8000/api/v1/auth/login",
+      "method": "POST",
+      "sortNum": 10000,
+      "created": "2026-11-24",
+      "modified": "2026-11-24",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"email\": \"superadmin@gov.in\",\n  \"password\": \"12345678\"\n}",
+        "form": []
+      }
+    },
+    {
+      "_id": "req-get-me",
+      "colId": "attendance-admin-api-v1",
+      "containerId": "folder-auth",
+      "name": "GET Auth Me (Verify Token Profile)",
+      "url": "http://192.168.0.130:8000/api/v1/auth/me",
+      "method": "GET",
+      "sortNum": 11000,
+      "created": "2026-11-24",
+      "modified": "2026-11-24",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        },
+        {
+          "name": "Accept",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req-register-user",
+      "colId": "attendance-admin-api-v1",
+      "containerId": "folder-auth",
+      "name": "POST Register Admin / Employee",
+      "url": "http://192.168.0.130:8000/api/v1/auth/register",
+      "method": "POST",
+      "sortNum": 12000,
+      "created": "2026-11-24",
+      "modified": "2026-11-24",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"emp_name\": \"Branch Manager\",\n  \"email\": \"admin@gov.in\",\n  \"password\": \"Admin@123456\",\n  \"role\": \"admin\",\n  \"emp_phone\": \"+919876543210\"\n}",
+        "form": []
+      }
+    },
+    {
+      "_id": "req-get-employees",
+      "colId": "attendance-admin-api-v1",
+      "containerId": "folder-employees",
+      "name": "GET All Employees",
+      "url": "http://192.168.0.130:8000/api/v1/employees",
+      "method": "GET",
+      "sortNum": 20000,
+      "created": "2026-11-24",
+      "modified": "2026-11-24",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        }
+      ]
+    },
+    {
+      "_id": "req-add-employee",
+      "colId": "attendance-admin-api-v1",
+      "containerId": "folder-employees",
+      "name": "POST Create Employee",
+      "url": "http://192.168.0.130:8000/api/v1/employees",
+      "method": "POST",
+      "sortNum": 21000,
+      "created": "2026-11-24",
+      "modified": "2026-11-24",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"full_name\": \"Debabrata Sharma\",\n  \"email\": \"debabrata.sharma@gov.in\",\n  \"designation\": \"Assistant Engineer\",\n  \"mobile_number\": \"+919436123456\"\n}",
+        "form": []
+      }
+    },
+    {
+      "_id": "req-get-offices",
+      "colId": "attendance-admin-api-v1",
+      "containerId": "folder-offices",
+      "name": "GET All Offices",
+      "url": "http://192.168.0.130:8000/api/v1/offices",
+      "method": "GET",
+      "sortNum": 30000,
+      "created": "2026-11-24",
+      "modified": "2026-11-24",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        }
+      ]
+    },
+    {
+      "_id": "req-add-office",
+      "colId": "attendance-admin-api-v1",
+      "containerId": "folder-offices",
+      "name": "POST Create Office Branch",
+      "url": "http://192.168.0.130:8000/api/v1/offices",
+      "method": "POST",
+      "sortNum": 31000,
+      "created": "2026-11-24",
+      "modified": "2026-11-24",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"office_name\": \"Headquarters Division\",\n  \"office_code\": \"TJB\",\n  \"office_locality\": \"Sakuntala Road, Sadar\",\n  \"office_city\": \"Agartala\",\n  \"office_state\": \"Tripura\",\n  \"office_pin\": 7990001,\n  \"latitude\": 23.8315,\n  \"longitude\": 91.2868,\n  \"geofence_radius\": 100,\n  \"radius_meters\": 100,\n  \"office_start_time\": \"10:00 AM\",\n  \"office_end_time\": \"05:30 PM\",\n  \"break_allowence\": 60,\n  \"standard_break_allowance_minutes\": 60,\n  \"office_grace_period\": 15,\n  \"break_grace_period_minutes\": 15\n}",
+        "form": []
+      }
+    },
+    {
+      "_id": "req-calibrate-office",
+      "colId": "attendance-admin-api-v1",
+      "containerId": "folder-offices",
+      "name": "PUT Update / Calibrate Office",
+      "url": "http://192.168.0.130:8000/api/v1/offices/office-main/calibration",
+      "method": "PUT",
+      "sortNum": 32000,
+      "created": "2026-11-24",
+      "modified": "2026-11-24",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"office_name\": \"Headquarters Division\",\n  \"office_code\": \"TJB\",\n  \"office_locality\": \"Sakuntala Road, Sadar\",\n  \"office_city\": \"Agartala\",\n  \"office_state\": \"Tripura\",\n  \"office_pin\": 7990001,\n  \"latitude\": 23.8315,\n  \"longitude\": 91.2868,\n  \"radius_meters\": 120,\n  \"geofence_radius\": 120,\n  \"shift_start_time\": \"10:00 AM\",\n  \"shift_end_time\": \"05:30 PM\",\n  \"office_start_time\": \"10:00 AM\",\n  \"office_end_time\": \"05:30 PM\",\n  \"break_allowence\": 60,\n  \"standard_break_allowance_minutes\": 60,\n  \"office_grace_period\": 15,\n  \"break_grace_period_minutes\": 15\n}",
+        "form": []
+      }
+    },
+    {
+      "_id": "req-get-sessions",
+      "colId": "attendance-admin-api-v1",
+      "containerId": "folder-attendance",
+      "name": "GET Attendance Sessions",
+      "url": "http://192.168.0.130:8000/api/v1/attendance/sessions",
+      "method": "GET",
+      "sortNum": 40000,
+      "created": "2026-11-24",
+      "modified": "2026-11-24",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        }
+      ]
+    },
+    {
+      "_id": "req-override-session",
+      "colId": "attendance-admin-api-v1",
+      "containerId": "folder-attendance",
+      "name": "PUT Override Attendance Session",
+      "url": "http://192.168.0.130:8000/api/v1/attendance/sessions/SESSION_ID/override",
+      "method": "PUT",
+      "sortNum": 41000,
+      "created": "2026-11-24",
+      "modified": "2026-11-24",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"active_status\": \"completed\",\n  \"confirmed_working_minutes\": 450,\n  \"actual_break_minutes\": 60,\n  \"admin_remarks\": \"Verified duty hours by Super Admin\"\n}",
+        "form": []
+      }
+    },
+    {
+      "_id": "req-get-leaves",
+      "colId": "attendance-admin-api-v1",
+      "containerId": "folder-leaves",
+      "name": "GET Leave Applications",
+      "url": "http://192.168.0.130:8000/api/v1/leaves",
+      "method": "GET",
+      "sortNum": 50000,
+      "created": "2026-11-24",
+      "modified": "2026-11-24",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        }
+      ]
+    },
+    {
+      "_id": "req-approve-leave",
+      "colId": "attendance-admin-api-v1",
+      "containerId": "folder-leaves",
+      "name": "POST Approve Leave",
+      "url": "http://192.168.0.130:8000/api/v1/leaves/LEAVE_ID/approve",
+      "method": "POST",
+      "sortNum": 51000,
+      "created": "2026-11-24",
+      "modified": "2026-11-24",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"remarks\": \"Approved by Super Admin\"\n}",
+        "form": []
+      }
+    },
+    {
+      "_id": "req-get-holidays",
+      "colId": "attendance-admin-api-v1",
+      "containerId": "folder-holidays",
+      "name": "GET Holidays Calendar",
+      "url": "http://192.168.0.130:8000/api/v1/holidays",
+      "method": "GET",
+      "sortNum": 60000,
+      "created": "2026-11-24",
+      "modified": "2026-11-24",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        }
+      ]
+    },
+    {
+      "_id": "req-add-holiday",
+      "colId": "attendance-admin-api-v1",
+      "containerId": "folder-holidays",
+      "name": "POST Add Annual Gazetted Holiday",
+      "url": "http://192.168.0.130:8000/api/v1/holidays",
+      "method": "POST",
+      "sortNum": 61000,
+      "created": "2026-11-24",
+      "modified": "2026-11-24",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"holiday_name\": \"Republic Day\",\n  \"holiday_date\": \"2026-01-26\",\n  \"year\": 2026,\n  \"description\": \"Official National Gazetted Holiday\"\n}",
+        "form": []
+      }
+    }
+  ]
+}

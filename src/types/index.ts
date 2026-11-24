@@ -33,7 +33,9 @@ export type LeaveType =
 export interface Office {
   id: string;
   office_name: string;
+  name?: string;
   office_code?: string; // Short form or acronym e.g. TJB for Tripura Jal Board
+  code?: string;
   address?: string;
   locality?: string;
   office_locality?: string;
@@ -42,17 +44,21 @@ export interface Office {
   state?: string;
   office_state?: string;
   pin?: string;
-  office_pin?: string;
+  office_pin?: string | number;
   latitude: number;
+  office_lat?: number;
   longitude: number;
+  office_long?: number;
   radius_meters: number;
   geofence_radius?: number;
   time_zone?: string;
   working_days?: number[]; // 1 to 7 (Mon=1, Sun=7)
   standard_break_allowance_minutes: number;
   break_allowance?: number;
+  break_allowence?: number;
   break_grace_period_minutes: number;
   grace_period?: number;
+  office_grace_period?: number;
   shift_start_time?: string; // e.g. "10:00 AM"
   office_start_time?: string;
   shift_end_time?: string;   // e.g. "05:30 PM"

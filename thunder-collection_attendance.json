@@ -1,7 +1,9 @@
 {
+  "client": "Thunder Client",
   "clientName": "Thunder Client",
   "collectionName": "Attendance Super Admin & Admin API",
   "collectionId": "attendance-admin-api-v1",
+  "ref": "attendance-admin-api-v1",
   "dateExported": "2026-11-24",
   "version": "1.2",
   "folders": [
@@ -204,7 +206,7 @@
       ],
       "body": {
         "type": "json",
-        "raw": "{\n  \"office_name\": \"Headquarters Division\",\n  \"office_code\": \"TJB\",\n  \"office_locality\": \"Sakuntala Road, Sadar\",\n  \"office_city\": \"Agartala\",\n  \"office_state\": \"Tripura\",\n  \"office_pin\": \"799001\",\n  \"latitude\": 23.8315,\n  \"longitude\": 91.2868,\n  \"geofence_radius\": 100,\n  \"radius_meters\": 100,\n  \"office_start_time\": \"10:00 AM\",\n  \"office_end_time\": \"05:30 PM\",\n  \"break_allowance\": 60,\n  \"standard_break_allowance_minutes\": 60,\n  \"grace_period\": 15,\n  \"break_grace_period_minutes\": 15\n}",
+        "raw": "{\n  \"office_name\": \"Headquarters Division\",\n  \"office_code\": \"TJB\",\n  \"office_locality\": \"Sakuntala Road, Sadar\",\n  \"office_city\": \"Agartala\",\n  \"office_state\": \"Tripura\",\n  \"office_pin\": 7990001,\n  \"latitude\": 23.8315,\n  \"longitude\": 91.2868,\n  \"geofence_radius\": 100,\n  \"radius_meters\": 100,\n  \"office_start_time\": \"10:00 AM\",\n  \"office_end_time\": \"05:30 PM\",\n  \"break_allowence\": 60,\n  \"standard_break_allowance_minutes\": 60,\n  \"office_grace_period\": 15,\n  \"break_grace_period_minutes\": 15\n}",
         "form": []
       }
     },
@@ -213,7 +215,7 @@
       "colId": "attendance-admin-api-v1",
       "containerId": "folder-offices",
       "name": "PUT Update / Calibrate Office",
-      "url": "http://192.168.0.130:8000/api/v1/offices/office-main",
+      "url": "http://192.168.0.130:8000/api/v1/offices/office-main/calibration",
       "method": "PUT",
       "sortNum": 32000,
       "created": "2026-11-24",
@@ -230,7 +232,7 @@
       ],
       "body": {
         "type": "json",
-        "raw": "{\n  \"latitude\": 23.8315,\n  \"longitude\": 91.2868,\n  \"radius_meters\": 120,\n  \"shift_start_time\": \"10:00 AM\",\n  \"shift_end_time\": \"05:30 PM\",\n  \"standard_break_allowance_minutes\": 60,\n  \"break_grace_period_minutes\": 15\n}",
+        "raw": "{\n  \"office_name\": \"Headquarters Division\",\n  \"office_code\": \"TJB\",\n  \"office_locality\": \"Sakuntala Road, Sadar\",\n  \"office_city\": \"Agartala\",\n  \"office_state\": \"Tripura\",\n  \"office_pin\": 7990001,\n  \"latitude\": 23.8315,\n  \"longitude\": 91.2868,\n  \"radius_meters\": 120,\n  \"geofence_radius\": 120,\n  \"shift_start_time\": \"10:00 AM\",\n  \"shift_end_time\": \"05:30 PM\",\n  \"office_start_time\": \"10:00 AM\",\n  \"office_end_time\": \"05:30 PM\",\n  \"break_allowence\": 60,\n  \"standard_break_allowance_minutes\": 60,\n  \"office_grace_period\": 15,\n  \"break_grace_period_minutes\": 15\n}",
         "form": []
       }
     },

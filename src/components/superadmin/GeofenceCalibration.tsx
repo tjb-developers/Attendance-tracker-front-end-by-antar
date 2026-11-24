@@ -57,6 +57,10 @@ export const GeofenceCalibration: React.FC = () => {
   const [newGracePeriod, setNewGracePeriod] = useState(15);
   const [isCreatingOffice, setIsCreatingOffice] = useState(false);
 
+  // Field validation error states
+  const [modalErrors, setModalErrors] = useState<Record<string, string>>({});
+  const [mainErrors, setMainErrors] = useState<Record<string, string>>({});
+
   // GPS Geolocation States
   const [isLocatingModal, setIsLocatingModal] = useState(false);
   const [gpsModalStatus, setGpsModalStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -178,15 +182,133 @@ export const GeofenceCalibration: React.FC = () => {
     }
   };
 
+  // Comprehensive field validation helper
+  const validateOfficeInputs = (data: {
+    name: string;
+    code: string;
+    locality: string;
+    city: string;
+    state: string;
+    pin: string;
+    lat: string | number;
+    lng: string | number;
+    radius: string | number;
+    startTime: string;
+    endTime: string;
+    breakMin: string | number;
+    graceMin: string | number;
+  }) => {
+    const errs: Record<string, string> = {};
+
+    if (!data.name.trim()) {
+      errs.name = 'Office Official Name is required.';
+    } else if (data.name.trim().length < 2) {
+      errs.name = 'Office Name must be at least 2 characters.';
+    }
+
+    if (!data.code.trim()) {
+      errs.code = 'Office Code is required (e.g. TJB).';
+    } else if (data.code.trim().length < 2) {
+      errs.code = 'Office Code should be at least 2 characters (e.g. TJB).';
+    }
+
+    if (!data.locality.trim()) {
+      errs.locality = 'Office Locality is required.';
+    } else if (data.locality.trim().length < 2) {
+      errs.locality = 'Locality must be at least 2 characters.';
+    }
+
+    if (!data.city.trim()) {
+      errs.city = 'Office City is required.';
+    } else if (data.city.trim().length < 2) {
+      errs.city = 'City must be at least 2 characters.';
+    }
+
+    if (!data.state.trim()) {
+      errs.state = 'Office State is required.';
+    } else if (data.state.trim().length < 2) {
+      errs.state = 'State must be at least 2 characters.';
+    }
+
+    // Strict 7-digit PIN validation
+    const pinStr = String(data.pin).trim();
+    if (!pinStr) {
+      errs.pin = 'Office Area PIN is required.';
+    } else if (!/^\d{7}$/.test(pinStr)) {
+      errs.pin = 'PIN must be exactly a 7-digit number (e.g. 7990001).';
+    }
+
+    const latNum = typeof data.lat === 'number' ? data.lat : parseFloat(data.lat);
+    if (isNaN(latNum) || latNum < -90 || latNum > 90) {
+      errs.lat = 'Valid Latitude between -90.0 and 90.0 is required.';
+    }
+
+    const lngNum = typeof data.lng === 'number' ? data.lng : parseFloat(data.lng);
+    if (isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
+      errs.lng = 'Valid Longitude between -180.0 and 180.0 is required.';
+    }
+
+    const radNum = typeof data.radius === 'number' ? data.radius : parseInt(String(data.radius), 10);
+    if (isNaN(radNum) || radNum < 10 || radNum > 50000) {
+      errs.radius = 'Geofence radius must be between 10m and 50,000m.';
+    }
+
+    if (!data.startTime.trim()) {
+      errs.startTime = 'Office Start Time is required (e.g. 10:00 AM).';
+    }
+
+    if (!data.endTime.trim()) {
+      errs.endTime = 'Office End Time is required (e.g. 05:30 PM).';
+    }
+
+    const bNum = typeof data.breakMin === 'number' ? data.breakMin : parseInt(String(data.breakMin), 10);
+    if (isNaN(bNum) || bNum < 0 || bNum > 480) {
+      errs.breakMin = 'Break allowance must be between 0 and 480 minutes.';
+    }
+
+    const gNum = typeof data.graceMin === 'number' ? data.graceMin : parseInt(String(data.graceMin), 10);
+    if (isNaN(gNum) || gNum < 0 || gNum > 120) {
+      errs.graceMin = 'Grace period must be between 0 and 120 minutes.';
+    }
+
+    return errs;
+  };
+
   const handleSaveCalibration = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeOffice) return;
 
-    const formattedAddress = [officeLocality, officeCity, officeState, officePin].filter(Boolean).join(', ') || activeOffice.address;
+    const errors = validateOfficeInputs({
+      name: officeName,
+      code: officeCode,
+      locality: officeLocality,
+      city: officeCity,
+      state: officeState,
+      pin: String(officePin),
+      lat: latitude,
+      lng: longitude,
+      radius: radiusMeters,
+      startTime: officeStartTime,
+      endTime: officeEndTime,
+      breakMin: breakAllowance,
+      graceMin: gracePeriod,
+    });
+
+    if (Object.keys(errors).length > 0) {
+      setMainErrors(errors);
+      const firstMsg = Object.values(errors)[0];
+      alert(`Validation Error:\n• ${firstMsg}`);
+      return;
+    }
+    setMainErrors({});
+
+    const formattedAddress = [officeLocality, officeCity, officeState, String(officePin)].filter(Boolean).join(', ') || activeOffice.address;
 
     await updateOfficeCalibration(activeOffice.id, {
       office_name: officeName.trim(),
+      name: officeName.trim(),
       office_code: officeCode.trim().toUpperCase(),
+      code: officeCode.trim().toUpperCase(),
       address: formattedAddress,
       locality: officeLocality.trim(),
       office_locality: officeLocality.trim(),
@@ -194,10 +316,12 @@ export const GeofenceCalibration: React.FC = () => {
       office_city: officeCity.trim(),
       state: officeState.trim(),
       office_state: officeState.trim(),
-      pin: officePin.trim(),
-      office_pin: officePin.trim(),
+      pin: String(officePin).trim(),
+      office_pin: String(officePin).trim(),
       latitude: Number(latitude),
+      office_lat: Number(latitude),
       longitude: Number(longitude),
+      office_long: Number(longitude),
       radius_meters: Number(radiusMeters),
       geofence_radius: Number(radiusMeters),
       office_start_time: officeStartTime.trim(),
@@ -206,8 +330,10 @@ export const GeofenceCalibration: React.FC = () => {
       shift_end_time: officeEndTime.trim(),
       standard_break_allowance_minutes: Number(breakAllowance),
       break_allowance: Number(breakAllowance),
+      break_allowence: Number(breakAllowance),
       break_grace_period_minutes: Number(gracePeriod),
       grace_period: Number(gracePeriod),
+      office_grace_period: Number(gracePeriod),
     });
 
     setSaveSuccess(true);
@@ -216,44 +342,41 @@ export const GeofenceCalibration: React.FC = () => {
 
   const handleCreateOffice = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newOfficeName.trim()) {
-      alert('Office Name is mandatory.');
+
+    const errors = validateOfficeInputs({
+      name: newOfficeName,
+      code: newOfficeCode,
+      locality: newOfficeLocality,
+      city: newOfficeCity,
+      state: newOfficeState,
+      pin: newOfficePin,
+      lat: newLatitude,
+      lng: newLongitude,
+      radius: newRadiusMeters,
+      startTime: newOfficeStartTime,
+      endTime: newOfficeEndTime,
+      breakMin: newBreakAllowance,
+      graceMin: newGracePeriod,
+    });
+
+    if (Object.keys(errors).length > 0) {
+      setModalErrors(errors);
+      const firstMsg = Object.values(errors)[0];
+      alert(`Validation Error:\n• ${firstMsg}`);
       return;
     }
-    if (!newOfficeCode.trim()) {
-      alert('Office Code is mandatory (e.g. TJB for Tripura Jal Board).');
-      return;
-    }
-    if (!newOfficeLocality.trim()) {
-      alert('Office Locality is mandatory.');
-      return;
-    }
-    if (!newOfficeCity.trim()) {
-      alert('Office City is mandatory.');
-      return;
-    }
-    if (!newOfficeState.trim()) {
-      alert('Office State is mandatory.');
-      return;
-    }
-    if (!newOfficePin.trim()) {
-      alert('Office Area PIN is mandatory.');
-      return;
-    }
+    setModalErrors({});
 
     const lat = parseFloat(newLatitude);
     const lng = parseFloat(newLongitude);
-    if (isNaN(lat) || isNaN(lng)) {
-      alert('Please enter valid numerical latitude and longitude coordinates.');
-      return;
-    }
-
     const formattedAddress = `${newOfficeLocality.trim()}, ${newOfficeCity.trim()}, ${newOfficeState.trim()} - ${newOfficePin.trim()}`;
 
     setIsCreatingOffice(true);
     const success = await addOffice({
       office_name: newOfficeName.trim(),
+      name: newOfficeName.trim(),
       office_code: newOfficeCode.trim().toUpperCase(),
+      code: newOfficeCode.trim().toUpperCase(),
       address: formattedAddress,
       locality: newOfficeLocality.trim(),
       office_locality: newOfficeLocality.trim(),
@@ -264,15 +387,19 @@ export const GeofenceCalibration: React.FC = () => {
       pin: newOfficePin.trim(),
       office_pin: newOfficePin.trim(),
       latitude: lat,
+      office_lat: lat,
       longitude: lng,
+      office_long: lng,
       radius_meters: Number(newRadiusMeters) || 100,
       geofence_radius: Number(newRadiusMeters) || 100,
       time_zone: 'Asia/Kolkata',
       working_days: [1, 2, 3, 4, 5, 6],
       standard_break_allowance_minutes: Number(newBreakAllowance) || 60,
       break_allowance: Number(newBreakAllowance) || 60,
+      break_allowence: Number(newBreakAllowance) || 60,
       break_grace_period_minutes: Number(newGracePeriod) || 15,
       grace_period: Number(newGracePeriod) || 15,
+      office_grace_period: Number(newGracePeriod) || 15,
       shift_start_time: newOfficeStartTime.trim() || '10:00 AM',
       office_start_time: newOfficeStartTime.trim() || '10:00 AM',
       shift_end_time: newOfficeEndTime.trim() || '05:30 PM',
@@ -295,6 +422,7 @@ export const GeofenceCalibration: React.FC = () => {
       setNewOfficeEndTime('05:30 PM');
       setNewBreakAllowance(60);
       setNewGracePeriod(15);
+      setModalErrors({});
       alert(`Office "${newOfficeName}" registered successfully!`);
     }
   };
@@ -469,6 +597,12 @@ export const GeofenceCalibration: React.FC = () => {
         </div>
       ) : (
         <form onSubmit={handleSaveCalibration} className="space-y-6">
+        {Object.keys(mainErrors).length > 0 && (
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold flex items-center gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+            <span>Please correct the errors in the highlighted fields below before saving.</span>
+          </div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Section 1: Office Details & GPS Geofence */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 sm:p-6 space-y-4">
@@ -491,10 +625,21 @@ export const GeofenceCalibration: React.FC = () => {
                   type="text"
                   required
                   value={officeName}
-                  onChange={(e) => setOfficeName(e.target.value)}
+                  onChange={(e) => {
+                    setOfficeName(e.target.value);
+                    if (mainErrors.name) setMainErrors((p) => { const n = { ...p }; delete n.name; return n; });
+                  }}
                   placeholder="e.g. Tripura Jal Board - Headquarters"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
+                    mainErrors.name ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                  }`}
                 />
+                {mainErrors.name && (
+                  <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                    {mainErrors.name}
+                  </span>
+                )}
               </div>
 
               <div>
@@ -506,13 +651,25 @@ export const GeofenceCalibration: React.FC = () => {
                   required
                   maxLength={10}
                   value={officeCode}
-                  onChange={(e) => setOfficeCode(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    setOfficeCode(e.target.value.toUpperCase());
+                    if (mainErrors.code) setMainErrors((p) => { const n = { ...p }; delete n.code; return n; });
+                  }}
                   placeholder="e.g. TJB"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold uppercase font-mono tracking-wider focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-bold uppercase font-mono tracking-wider focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
+                    mainErrors.code ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                  }`}
                 />
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Short form of the office like Tripura Jal Board as <strong>TJB</strong>
-                </span>
+                {mainErrors.code ? (
+                  <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                    {mainErrors.code}
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Short form like Tripura Jal Board as <strong>TJB</strong>
+                  </span>
+                )}
               </div>
             </div>
 
@@ -526,10 +683,21 @@ export const GeofenceCalibration: React.FC = () => {
                   type="text"
                   required
                   value={officeLocality}
-                  onChange={(e) => setOfficeLocality(e.target.value)}
+                  onChange={(e) => {
+                    setOfficeLocality(e.target.value);
+                    if (mainErrors.locality) setMainErrors((p) => { const n = { ...p }; delete n.locality; return n; });
+                  }}
                   placeholder="e.g. Sakuntala Road / Sector 5"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
+                    mainErrors.locality ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                  }`}
                 />
+                {mainErrors.locality && (
+                  <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                    {mainErrors.locality}
+                  </span>
+                )}
               </div>
 
               <div>
@@ -540,10 +708,21 @@ export const GeofenceCalibration: React.FC = () => {
                   type="text"
                   required
                   value={officeCity}
-                  onChange={(e) => setOfficeCity(e.target.value)}
+                  onChange={(e) => {
+                    setOfficeCity(e.target.value);
+                    if (mainErrors.city) setMainErrors((p) => { const n = { ...p }; delete n.city; return n; });
+                  }}
                   placeholder="e.g. Agartala"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
+                    mainErrors.city ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                  }`}
                 />
+                {mainErrors.city && (
+                  <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                    {mainErrors.city}
+                  </span>
+                )}
               </div>
 
               <div>
@@ -554,24 +733,53 @@ export const GeofenceCalibration: React.FC = () => {
                   type="text"
                   required
                   value={officeState}
-                  onChange={(e) => setOfficeState(e.target.value)}
+                  onChange={(e) => {
+                    setOfficeState(e.target.value);
+                    if (mainErrors.state) setMainErrors((p) => { const n = { ...p }; delete n.state; return n; });
+                  }}
                   placeholder="e.g. Tripura"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
+                    mainErrors.state ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                  }`}
                 />
+                {mainErrors.state && (
+                  <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                    {mainErrors.state}
+                  </span>
+                )}
               </div>
 
               <div>
                 <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                  Office Area PIN *
+                  Office Area PIN (7 Digits) *
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   required
+                  maxLength={7}
                   value={officePin}
-                  onChange={(e) => setOfficePin(e.target.value)}
-                  placeholder="e.g. 799001"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 7);
+                    setOfficePin(val);
+                    if (mainErrors.pin) setMainErrors((p) => { const n = { ...p }; delete n.pin; return n; });
+                  }}
+                  placeholder="e.g. 7990001"
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
+                    mainErrors.pin ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                  }`}
                 />
+                {mainErrors.pin ? (
+                  <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                    {mainErrors.pin}
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Must be exactly 7 digits (e.g. <strong>7990001</strong>)
+                  </span>
+                )}
               </div>
             </div>
 
@@ -618,10 +826,20 @@ export const GeofenceCalibration: React.FC = () => {
                     step="0.000001"
                     required
                     value={latitude}
-                    onChange={(e) => setLatitude(parseFloat(e.target.value))}
+                    onChange={(e) => {
+                      setLatitude(parseFloat(e.target.value));
+                      if (mainErrors.lat) setMainErrors((p) => { const n = { ...p }; delete n.lat; return n; });
+                    }}
                     placeholder="23.831500"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
+                      mainErrors.lat ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                    }`}
                   />
+                  {mainErrors.lat && (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 block">
+                      {mainErrors.lat}
+                    </span>
+                  )}
                 </div>
 
                 <div>
@@ -633,10 +851,20 @@ export const GeofenceCalibration: React.FC = () => {
                     step="0.000001"
                     required
                     value={longitude}
-                    onChange={(e) => setLongitude(parseFloat(e.target.value))}
+                    onChange={(e) => {
+                      setLongitude(parseFloat(e.target.value));
+                      if (mainErrors.lng) setMainErrors((p) => { const n = { ...p }; delete n.lng; return n; });
+                    }}
                     placeholder="91.286800"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${
+                      mainErrors.lng ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                    }`}
                   />
+                  {mainErrors.lng && (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 block">
+                      {mainErrors.lng}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -656,7 +884,10 @@ export const GeofenceCalibration: React.FC = () => {
                 max="500"
                 step="10"
                 value={radiusMeters}
-                onChange={(e) => setRadiusMeters(parseInt(e.target.value))}
+                onChange={(e) => {
+                  setRadiusMeters(parseInt(e.target.value));
+                  if (mainErrors.radius) setMainErrors((p) => { const n = { ...p }; delete n.radius; return n; });
+                }}
                 className="w-full accent-indigo-600 cursor-pointer"
               />
               <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
@@ -664,6 +895,11 @@ export const GeofenceCalibration: React.FC = () => {
                 <span>100m (Default)</span>
                 <span>500m (Wide Campus)</span>
               </div>
+              {mainErrors.radius && (
+                <span className="text-[10px] text-rose-600 font-semibold mt-1 block">
+                  {mainErrors.radius}
+                </span>
+              )}
             </div>
 
             {/* Geofence Status Box */}
@@ -700,11 +936,20 @@ export const GeofenceCalibration: React.FC = () => {
                   type="text"
                   required
                   value={officeStartTime}
-                  onChange={(e) => setOfficeStartTime(e.target.value)}
+                  onChange={(e) => {
+                    setOfficeStartTime(e.target.value);
+                    if (mainErrors.startTime) setMainErrors((p) => { const n = { ...p }; delete n.startTime; return n; });
+                  }}
                   placeholder="10:00 AM"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
+                    mainErrors.startTime ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                  }`}
                 />
-                <span className="text-[10px] text-slate-400 mt-0.5 block">e.g. 10:00 AM</span>
+                {mainErrors.startTime ? (
+                  <span className="text-[10px] text-rose-600 font-semibold mt-0.5 block">{mainErrors.startTime}</span>
+                ) : (
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">e.g. 10:00 AM</span>
+                )}
               </div>
 
               <div>
@@ -715,11 +960,20 @@ export const GeofenceCalibration: React.FC = () => {
                   type="text"
                   required
                   value={officeEndTime}
-                  onChange={(e) => setOfficeEndTime(e.target.value)}
+                  onChange={(e) => {
+                    setOfficeEndTime(e.target.value);
+                    if (mainErrors.endTime) setMainErrors((p) => { const n = { ...p }; delete n.endTime; return n; });
+                  }}
                   placeholder="05:30 PM"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
+                    mainErrors.endTime ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                  }`}
                 />
-                <span className="text-[10px] text-slate-400 mt-0.5 block">e.g. 05:30 PM</span>
+                {mainErrors.endTime ? (
+                  <span className="text-[10px] text-rose-600 font-semibold mt-0.5 block">{mainErrors.endTime}</span>
+                ) : (
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">e.g. 05:30 PM</span>
+                )}
               </div>
             </div>
 
@@ -732,18 +986,27 @@ export const GeofenceCalibration: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
-                    min="15"
-                    max="180"
+                    min="0"
+                    max="480"
                     required
                     value={breakAllowance}
-                    onChange={(e) => setBreakAllowance(parseInt(e.target.value) || 60)}
-                    className="w-24 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 font-mono"
+                    onChange={(e) => {
+                      setBreakAllowance(parseInt(e.target.value) || 0);
+                      if (mainErrors.breakMin) setMainErrors((p) => { const n = { ...p }; delete n.breakMin; return n; });
+                    }}
+                    className={`w-24 px-3 py-1.5 bg-white border rounded-lg text-xs font-bold text-slate-900 font-mono ${
+                      mainErrors.breakMin ? 'border-rose-500' : 'border-slate-300'
+                    }`}
                   />
                   <span className="text-xs text-slate-600 font-medium">Minutes (Standard: 60 min)</span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  Allowed break duration displayed on employee mobile timer.
-                </p>
+                {mainErrors.breakMin ? (
+                  <span className="text-[10px] text-rose-600 font-semibold mt-1 block">{mainErrors.breakMin}</span>
+                ) : (
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Allowed break duration displayed on employee mobile timer.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -754,17 +1017,26 @@ export const GeofenceCalibration: React.FC = () => {
                   <input
                     type="number"
                     min="0"
-                    max="60"
+                    max="120"
                     required
                     value={gracePeriod}
-                    onChange={(e) => setGracePeriod(parseInt(e.target.value) || 15)}
-                    className="w-24 px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 font-mono"
+                    onChange={(e) => {
+                      setGracePeriod(parseInt(e.target.value) || 0);
+                      if (mainErrors.graceMin) setMainErrors((p) => { const n = { ...p }; delete n.graceMin; return n; });
+                    }}
+                    className={`w-24 px-3 py-1.5 bg-white border rounded-lg text-xs font-bold text-slate-900 font-mono ${
+                      mainErrors.graceMin ? 'border-rose-500' : 'border-slate-300'
+                    }`}
                   />
                   <span className="text-xs text-slate-600 font-medium">Minutes Buffer (Standard: 15 min)</span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  Buffer time before triggering excess break alert notifications.
-                </p>
+                {mainErrors.graceMin ? (
+                  <span className="text-[10px] text-rose-600 font-semibold mt-1 block">{mainErrors.graceMin}</span>
+                ) : (
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Buffer time before triggering excess break alert notifications.
+                  </p>
+                )}
               </div>
 
               {/* Excess Break Calculation Pill */}
@@ -831,19 +1103,37 @@ export const GeofenceCalibration: React.FC = () => {
 
             {/* Modal Body */}
             <form onSubmit={handleCreateOffice} className="p-6 overflow-y-auto space-y-4">
+              {Object.keys(modalErrors).length > 0 && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                  <span>Please fix the highlighted errors below before registering this office.</span>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
                   <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                    Office Name *
+                    Office Official Name *
                   </label>
                   <input
                     type="text"
                     required
                     value={newOfficeName}
-                    onChange={(e) => setNewOfficeName(e.target.value)}
+                    onChange={(e) => {
+                      setNewOfficeName(e.target.value);
+                      if (modalErrors.name) setModalErrors((p) => { const n = { ...p }; delete n.name; return n; });
+                    }}
                     placeholder="e.g. Tripura Jal Board - Headquarters"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
+                      modalErrors.name ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                    }`}
                   />
+                  {modalErrors.name && (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      {modalErrors.name}
+                    </span>
+                  )}
                 </div>
 
                 <div>
@@ -855,13 +1145,25 @@ export const GeofenceCalibration: React.FC = () => {
                     required
                     maxLength={10}
                     value={newOfficeCode}
-                    onChange={(e) => setNewOfficeCode(e.target.value.toUpperCase())}
+                    onChange={(e) => {
+                      setNewOfficeCode(e.target.value.toUpperCase());
+                      if (modalErrors.code) setModalErrors((p) => { const n = { ...p }; delete n.code; return n; });
+                    }}
                     placeholder="e.g. TJB"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold uppercase font-mono tracking-wider focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg text-xs font-bold uppercase font-mono tracking-wider focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
+                      modalErrors.code ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                    }`}
                   />
-                  <span className="text-[10px] text-slate-400 mt-1 block">
-                    Short form like Tripura Jal Board as <strong>TJB</strong>
-                  </span>
+                  {modalErrors.code ? (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      {modalErrors.code}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      Short form like Tripura Jal Board as <strong>TJB</strong>
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -875,10 +1177,21 @@ export const GeofenceCalibration: React.FC = () => {
                     type="text"
                     required
                     value={newOfficeLocality}
-                    onChange={(e) => setNewOfficeLocality(e.target.value)}
+                    onChange={(e) => {
+                      setNewOfficeLocality(e.target.value);
+                      if (modalErrors.locality) setModalErrors((p) => { const n = { ...p }; delete n.locality; return n; });
+                    }}
                     placeholder="e.g. Sakuntala Road / Sector 4"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
+                      modalErrors.locality ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                    }`}
                   />
+                  {modalErrors.locality && (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      {modalErrors.locality}
+                    </span>
+                  )}
                 </div>
 
                 <div>
@@ -889,10 +1202,21 @@ export const GeofenceCalibration: React.FC = () => {
                     type="text"
                     required
                     value={newOfficeCity}
-                    onChange={(e) => setNewOfficeCity(e.target.value)}
+                    onChange={(e) => {
+                      setNewOfficeCity(e.target.value);
+                      if (modalErrors.city) setModalErrors((p) => { const n = { ...p }; delete n.city; return n; });
+                    }}
                     placeholder="e.g. Agartala"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
+                      modalErrors.city ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                    }`}
                   />
+                  {modalErrors.city && (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      {modalErrors.city}
+                    </span>
+                  )}
                 </div>
 
                 <div>
@@ -903,24 +1227,53 @@ export const GeofenceCalibration: React.FC = () => {
                     type="text"
                     required
                     value={newOfficeState}
-                    onChange={(e) => setNewOfficeState(e.target.value)}
+                    onChange={(e) => {
+                      setNewOfficeState(e.target.value);
+                      if (modalErrors.state) setModalErrors((p) => { const n = { ...p }; delete n.state; return n; });
+                    }}
                     placeholder="e.g. Tripura"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
+                      modalErrors.state ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                    }`}
                   />
+                  {modalErrors.state && (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      {modalErrors.state}
+                    </span>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-slate-700 font-bold uppercase tracking-wider text-[10px] mb-1">
-                    Office Area PIN *
+                    Office Area PIN (7 Digits) *
                   </label>
                   <input
                     type="text"
+                    inputMode="numeric"
                     required
+                    maxLength={7}
                     value={newOfficePin}
-                    onChange={(e) => setNewOfficePin(e.target.value)}
-                    placeholder="e.g. 799001"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 7);
+                      setNewOfficePin(val);
+                      if (modalErrors.pin) setModalErrors((p) => { const n = { ...p }; delete n.pin; return n; });
+                    }}
+                    placeholder="e.g. 7990001"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-mono focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
+                      modalErrors.pin ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                    }`}
                   />
+                  {modalErrors.pin ? (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                      {modalErrors.pin}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      Must be exactly 7 digits (e.g. <strong>7990001</strong>)
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -968,10 +1321,18 @@ export const GeofenceCalibration: React.FC = () => {
                       step="0.000001"
                       required
                       value={newLatitude}
-                      onChange={(e) => setNewLatitude(e.target.value)}
+                      onChange={(e) => {
+                        setNewLatitude(e.target.value);
+                        if (modalErrors.lat) setModalErrors((p) => { const n = { ...p }; delete n.lat; return n; });
+                      }}
                       placeholder="e.g. 23.831500"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
+                        modalErrors.lat ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                      }`}
                     />
+                    {modalErrors.lat && (
+                      <span className="text-[10px] text-rose-600 font-semibold mt-1 block">{modalErrors.lat}</span>
+                    )}
                   </div>
 
                   <div>
@@ -983,10 +1344,18 @@ export const GeofenceCalibration: React.FC = () => {
                       step="0.000001"
                       required
                       value={newLongitude}
-                      onChange={(e) => setNewLongitude(e.target.value)}
+                      onChange={(e) => {
+                        setNewLongitude(e.target.value);
+                        if (modalErrors.lng) setModalErrors((p) => { const n = { ...p }; delete n.lng; return n; });
+                      }}
                       placeholder="e.g. 91.286800"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                      className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg font-mono text-xs focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${
+                        modalErrors.lng ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                      }`}
                     />
+                    {modalErrors.lng && (
+                      <span className="text-[10px] text-rose-600 font-semibold mt-1 block">{modalErrors.lng}</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -999,14 +1368,23 @@ export const GeofenceCalibration: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    min="50"
-                    max="500"
+                    min="10"
+                    max="50000"
                     required
                     value={newRadiusMeters}
-                    onChange={(e) => setNewRadiusMeters(parseInt(e.target.value) || 100)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg font-mono text-xs"
+                    onChange={(e) => {
+                      setNewRadiusMeters(parseInt(e.target.value) || 100);
+                      if (modalErrors.radius) setModalErrors((p) => { const n = { ...p }; delete n.radius; return n; });
+                    }}
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg font-mono text-xs ${
+                      modalErrors.radius ? 'border-rose-500' : 'border-slate-300'
+                    }`}
                   />
-                  <span className="text-[10px] text-slate-400">Default: 100m</span>
+                  {modalErrors.radius ? (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-0.5 block">{modalErrors.radius}</span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400">Default: 100m</span>
+                  )}
                 </div>
 
                 <div>
@@ -1017,11 +1395,20 @@ export const GeofenceCalibration: React.FC = () => {
                     type="text"
                     required
                     value={newOfficeStartTime}
-                    onChange={(e) => setNewOfficeStartTime(e.target.value)}
+                    onChange={(e) => {
+                      setNewOfficeStartTime(e.target.value);
+                      if (modalErrors.startTime) setModalErrors((p) => { const n = { ...p }; delete n.startTime; return n; });
+                    }}
                     placeholder="10:00 AM"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg font-mono text-xs"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg font-mono text-xs ${
+                      modalErrors.startTime ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                    }`}
                   />
-                  <span className="text-[10px] text-slate-400">e.g. 10:00 AM</span>
+                  {modalErrors.startTime ? (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-0.5 block">{modalErrors.startTime}</span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400">e.g. 10:00 AM</span>
+                  )}
                 </div>
 
                 <div>
@@ -1032,11 +1419,20 @@ export const GeofenceCalibration: React.FC = () => {
                     type="text"
                     required
                     value={newOfficeEndTime}
-                    onChange={(e) => setNewOfficeEndTime(e.target.value)}
+                    onChange={(e) => {
+                      setNewOfficeEndTime(e.target.value);
+                      if (modalErrors.endTime) setModalErrors((p) => { const n = { ...p }; delete n.endTime; return n; });
+                    }}
                     placeholder="05:30 PM"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg font-mono text-xs"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg font-mono text-xs ${
+                      modalErrors.endTime ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
+                    }`}
                   />
-                  <span className="text-[10px] text-slate-400">e.g. 05:30 PM</span>
+                  {modalErrors.endTime ? (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-0.5 block">{modalErrors.endTime}</span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400">e.g. 05:30 PM</span>
+                  )}
                 </div>
               </div>
 
@@ -1048,15 +1444,24 @@ export const GeofenceCalibration: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    min="15"
-                    max="180"
+                    min="0"
+                    max="480"
                     required
                     value={newBreakAllowance}
-                    onChange={(e) => setNewBreakAllowance(parseInt(e.target.value) || 60)}
+                    onChange={(e) => {
+                      setNewBreakAllowance(parseInt(e.target.value) || 0);
+                      if (modalErrors.breakMin) setModalErrors((p) => { const n = { ...p }; delete n.breakMin; return n; });
+                    }}
                     placeholder="60"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-mono text-xs"
+                    className={`w-full px-3 py-2 bg-white border rounded-lg font-mono text-xs ${
+                      modalErrors.breakMin ? 'border-rose-500' : 'border-slate-300'
+                    }`}
                   />
-                  <span className="text-[10px] text-slate-400">Standard allowance: 60m</span>
+                  {modalErrors.breakMin ? (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 block">{modalErrors.breakMin}</span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400">Standard allowance: 60m</span>
+                  )}
                 </div>
 
                 <div>
@@ -1066,14 +1471,23 @@ export const GeofenceCalibration: React.FC = () => {
                   <input
                     type="number"
                     min="0"
-                    max="60"
+                    max="120"
                     required
                     value={newGracePeriod}
-                    onChange={(e) => setNewGracePeriod(parseInt(e.target.value) || 15)}
+                    onChange={(e) => {
+                      setNewGracePeriod(parseInt(e.target.value) || 0);
+                      if (modalErrors.graceMin) setModalErrors((p) => { const n = { ...p }; delete n.graceMin; return n; });
+                    }}
                     placeholder="15"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-mono text-xs"
+                    className={`w-full px-3 py-2 bg-white border rounded-lg font-mono text-xs ${
+                      modalErrors.graceMin ? 'border-rose-500' : 'border-slate-300'
+                    }`}
                   />
-                  <span className="text-[10px] text-amber-700 font-medium">Alert threshold: {Number(newBreakAllowance) + Number(newGracePeriod)}m</span>
+                  {modalErrors.graceMin ? (
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 block">{modalErrors.graceMin}</span>
+                  ) : (
+                    <span className="text-[10px] text-amber-700 font-medium">Alert threshold: {Number(newBreakAllowance) + Number(newGracePeriod)}m</span>
+                  )}
                 </div>
               </div>
 
