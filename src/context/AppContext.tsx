@@ -222,7 +222,71 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const extractArray = <T,>(payload: any): T[] => {
     if (Array.isArray(payload)) return payload;
     if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.offices)) return payload.offices;
     return [];
+  };
+
+  // Normalize office objects from PostgreSQL / backend RPCs (office_lat -> latitude, office_id -> id, etc.)
+  const normalizeOffice = (o: any): Office => {
+    const lat = Number(o.latitude ?? o.office_lat ?? 0);
+    const lng = Number(o.longitude ?? o.office_long ?? 0);
+    const radius = Number(o.radius_meters ?? o.geofence_radius ?? 100);
+    const loc = o.locality || o.office_locality || '';
+    const city = o.city || o.office_city || '';
+    const state = o.state || o.office_state || '';
+    const pin = o.pin ?? o.office_pin ?? '';
+    const address =
+      o.address ||
+      [loc, city, state, pin].filter(Boolean).join(', ') ||
+      loc ||
+      '';
+
+    return {
+      ...o,
+      id: o.id || o.office_id || o.office_code || `off-${Math.random().toString(36).slice(2)}`,
+      office_name: o.office_name || o.name || 'Unnamed Office',
+      office_code: o.office_code || o.code || '',
+      locality: loc,
+      office_locality: loc,
+      city,
+      office_city: city,
+      state,
+      office_state: state,
+      pin: pin !== undefined && pin !== null ? String(pin) : '',
+      office_pin: pin !== undefined && pin !== null ? String(pin) : '',
+      address,
+      latitude: isNaN(lat) ? 0 : lat,
+      office_lat: isNaN(lat) ? 0 : lat,
+      longitude: isNaN(lng) ? 0 : lng,
+      office_long: isNaN(lng) ? 0 : lng,
+      radius_meters: isNaN(radius) ? 100 : radius,
+      geofence_radius: isNaN(radius) ? 100 : radius,
+      shift_start_time: to12HourDisplay(o.shift_start_time || o.office_start_time, 10, 0, 'AM'),
+      office_start_time: to12HourDisplay(o.office_start_time || o.shift_start_time, 10, 0, 'AM'),
+      shift_end_time: to12HourDisplay(o.shift_end_time || o.office_end_time, 5, 30, 'PM'),
+      office_end_time: to12HourDisplay(o.office_end_time || o.shift_end_time, 5, 30, 'PM'),
+      standard_break_allowance_minutes: Number(
+        o.standard_break_allowance_minutes ?? o.break_allowance ?? o.break_allowence ?? 60
+      ),
+      break_allowance: Number(
+        o.break_allowance ?? o.break_allowence ?? o.standard_break_allowance_minutes ?? 60
+      ),
+      break_allowence: Number(
+        o.break_allowence ?? o.break_allowance ?? o.standard_break_allowance_minutes ?? 60
+      ),
+      break_grace_period_minutes: Number(
+        o.break_grace_period_minutes ?? o.grace_period ?? o.office_grace_period ?? 15
+      ),
+      grace_period: Number(
+        o.grace_period ?? o.office_grace_period ?? o.break_grace_period_minutes ?? 15
+      ),
+      office_grace_period: Number(
+        o.office_grace_period ?? o.grace_period ?? o.break_grace_period_minutes ?? 15
+      ),
+      time_zone: o.time_zone || 'Asia/Kolkata',
+      working_days: Array.isArray(o.working_days) ? o.working_days : [1, 2, 3, 4, 5, 6],
+      created_at: o.created_at || new Date().toISOString(),
+    };
   };
 
   const normalizeUser = (u: any): AdminUser => ({
@@ -240,7 +304,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       // 1. Fetch offices
       const offRes = await officesApi.getAll();
-      const newOffices = extractArray<Office>(offRes.data);
+      const newOffices = extractArray<any>(offRes.data).map(normalizeOffice);
       setOffices(newOffices);
 
       // 2. Fetch admins
