@@ -14,6 +14,7 @@ import {
   Building2,
   Calendar,
   LogOut,
+  Megaphone,
 } from 'lucide-react';
 
 export type ActiveTab =
@@ -23,9 +24,10 @@ export type ActiveTab =
   | 'outduty'
   | 'corrections'
   | 'reports'
+  | 'announcements'
+  | 'holidays'
   | 'superadmin_admins'
   | 'superadmin_geofence'
-  | 'superadmin_holidays'
   | 'superadmin_override'
   | 'superadmin_audit';
 
@@ -87,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               Attendance Tracker by TJB
             </h1>
             <p className="text-[10px] text-sky-400 font-medium tracking-wide uppercase truncate">
-              Tripura Jal Board Portal
+              Attendance Management Portal
             </p>
           </div>
         </div>
@@ -197,6 +199,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span>Reports & Export</span>
                 </div>
               </button>
+
+              <button
+                onClick={() => handleSelectTab('announcements')}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${activeTab === 'announcements'
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
+                    : 'text-slate-300 hover:bg-[#1B263B] hover:text-white'
+                  }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Megaphone className="w-4 h-4 text-rose-400" />
+                  <span>Announcements</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleSelectTab('holidays')}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${activeTab === 'holidays'
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
+                    : 'text-slate-300 hover:bg-[#1B263B] hover:text-white'
+                  }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-4 h-4 text-emerald-400" />
+                  <span>Holiday Calendar</span>
+                </div>
+              </button>
             </nav>
           </div>
 
@@ -204,7 +232,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {isSuperAdmin && (
             <div>
               <div className="px-3 mb-2 flex items-center justify-between text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
-                <span>Super Admin Authority</span>
+                <span>System Administration</span>
               </div>
 
               <nav className="space-y-1">
@@ -231,19 +259,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="flex items-center gap-3">
                     <MapPin className="w-4 h-4 text-rose-400" />
                     <span>Office & Geofence</span>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleSelectTab('superadmin_holidays')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${activeTab === 'superadmin_holidays'
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-950/40'
-                      : 'text-slate-300 hover:bg-[#1B263B] hover:text-white'
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Calendar className="w-4 h-4 text-emerald-400" />
-                    <span>Holiday Calendar</span>
                   </div>
                 </button>
 

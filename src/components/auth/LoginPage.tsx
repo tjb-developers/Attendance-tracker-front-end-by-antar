@@ -6,29 +6,14 @@ import {
   Building2,
   Lock,
   Loader2,
-  Shield,
-  ShieldCheck,
 } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const { login } = useApp();
-  const [role, setRole] = useState<'admin' | 'super_admin'>('admin');
-  const [email, setEmail] = useState('admin@gov.in');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleRoleChange = (newRole: 'admin' | 'super_admin') => {
-    setRole(newRole);
-    setErrorMessage(null);
-    if (newRole === 'super_admin') {
-      setEmail('superadmin@gov.in');
-      setPassword('12345678');
-    } else {
-      setEmail('admin@gov.in');
-      setPassword('');
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,17 +21,17 @@ export const LoginPage: React.FC = () => {
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setErrorMessage('Please enter your administrator email address.');
+      setErrorMessage('Please enter your email address.');
       return;
     }
 
     if (!password) {
-      setErrorMessage('Please enter your administrator password.');
+      setErrorMessage('Please enter your password.');
       return;
     }
 
     setIsSubmitting(true);
-    const result = await login(trimmedEmail, password, role);
+    const result = await login(trimmedEmail, password);
     setIsSubmitting(false);
 
     if (!result.success) {
@@ -71,7 +56,7 @@ export const LoginPage: React.FC = () => {
           Attendance Tracker by TJB
         </h1>
         <p className="text-slate-300 text-sm mt-1 font-medium">
-          Admin & Super Admin Management Portal
+          Attendance Management Portal
         </p>
       </div>
 
@@ -80,53 +65,8 @@ export const LoginPage: React.FC = () => {
         <div className="mb-5">
           <h2 className="text-lg font-bold text-slate-900">Sign in to your account</h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Select your administrative role and enter your portal credentials.
+            Enter your credentials to access your assigned portal workspace.
           </p>
-        </div>
-
-        {/* Role Selector Tabs (Default: Admin) */}
-        <div className="mb-5">
-
-          <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-xl border border-slate-200">
-            {/* Admin Tab */}
-            <button
-              type="button"
-              onClick={() => handleRoleChange('admin')}
-              className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${role === 'admin'
-                ? 'bg-white text-blue-700 shadow-sm border border-slate-200/80'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-                }`}
-            >
-              <Shield className={`w-4 h-4 ${role === 'admin' ? 'text-blue-600' : 'text-slate-400'}`} />
-              <span>Admin</span>
-              {role === 'admin' && (
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse" />
-              )}
-            </button>
-
-            {/* Super Admin Tab */}
-            <button
-              type="button"
-              onClick={() => handleRoleChange('super_admin')}
-              className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${role === 'super_admin'
-                ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/80'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-                }`}
-            >
-              <ShieldCheck className={`w-4 h-4 ${role === 'super_admin' ? 'text-indigo-600' : 'text-slate-400'}`} />
-              <span>Super Admin</span>
-              {role === 'super_admin' && (
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
-              )}
-            </button>
-          </div>
-          <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
-            <span>
-              {role === 'super_admin'
-                ? 'Super Admin: Full calibration authority & multi-office oversight'
-                : 'Admin: Branch management, employee monitoring & leave approvals'}
-            </span>
-          </div>
         </div>
 
         {errorMessage && (
@@ -140,7 +80,7 @@ export const LoginPage: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-              {role === 'super_admin' ? 'Super Admin Email Address' : 'Admin Email Address'}
+              Email Address
             </label>
             <input
               type="email"
@@ -148,7 +88,7 @@ export const LoginPage: React.FC = () => {
               disabled={isSubmitting}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder={role === 'super_admin' ? 'superadmin@gov.in' : 'admin@gov.in'}
+              placeholder="you@example.com"
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition disabled:opacity-50"
             />
           </div>
@@ -171,19 +111,16 @@ export const LoginPage: React.FC = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`w-full py-2.5 px-4 text-white font-semibold rounded-lg text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 group disabled:opacity-60 cursor-pointer ${role === 'super_admin'
-              ? 'bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800'
-              : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
-              }`}
+            className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-lg text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 group disabled:opacity-60 cursor-pointer"
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Authenticating...</span>
+                <span>Logging in...</span>
               </>
             ) : (
               <>
-                <span>Sign In as {role === 'super_admin' ? 'Super Admin' : 'Admin'}</span>
+                <span>Sign In</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </>
             )}

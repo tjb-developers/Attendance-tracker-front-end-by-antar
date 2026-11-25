@@ -21,8 +21,9 @@ import { ClockTimePicker, parseTimeToParts, buildTimeOutputs } from '../common/C
 export const GeofenceCalibration: React.FC = () => {
   const { offices, updateOfficeCalibration, addOffice, deleteOffice, isSuperAdmin } = useApp();
 
-  const [selectedOfficeId, setSelectedOfficeId] = useState<string>(offices[0]?.id || '');
-  const activeOffice = offices.find((o) => o.id === selectedOfficeId) || offices[0];
+  const [selectedOfficeId, setSelectedOfficeId] = useState<string>('');
+  const [isEditingOffice, setIsEditingOffice] = useState<boolean>(false);
+  const activeOffice = offices.find((o) => o.id === selectedOfficeId) || null;
 
   // Active office form state (Separate fields)
   const [officeName, setOfficeName] = useState(activeOffice?.office_name || '');
@@ -150,31 +151,36 @@ export const GeofenceCalibration: React.FC = () => {
     );
   };
 
-  // Sync state whenever offices change
+  // Sync state whenever offices change (only if an office is currently selected)
   useEffect(() => {
-    if (offices.length > 0) {
-      const current = offices.find((o) => o.id === selectedOfficeId) || offices[0];
-      setSelectedOfficeId(current.id);
-      setOfficeName(current.office_name);
-      setOfficeCode(current.office_code || '');
-      setOfficeLocality(current.locality || current.office_locality || '');
-      setOfficeCity(current.city || current.office_city || '');
-      setOfficeState(current.state || current.office_state || '');
-      setOfficePin(current.pin || current.office_pin || '');
-      setLatitude(Number(current.latitude ?? current.office_lat ?? 0));
-      setLongitude(Number(current.longitude ?? current.office_long ?? 0));
-      setRadiusMeters(current.radius_meters || current.geofence_radius || 100);
-      setOfficeStartTime(current.office_start_time || current.shift_start_time || '10:00 AM');
-      setOfficeStartTimeIso('');
-      setOfficeEndTime(current.office_end_time || current.shift_end_time || '05:30 PM');
-      setOfficeEndTimeIso('');
-      setBreakAllowance(current.break_allowance || current.standard_break_allowance_minutes || 60);
-      setGracePeriod(current.grace_period || current.break_grace_period_minutes || 15);
+    if (selectedOfficeId && offices.length > 0) {
+      const current = offices.find((o) => o.id === selectedOfficeId);
+      if (current) {
+        setOfficeName(current.office_name);
+        setOfficeCode(current.office_code || '');
+        setOfficeLocality(current.locality || current.office_locality || '');
+        setOfficeCity(current.city || current.office_city || '');
+        setOfficeState(current.state || current.office_state || '');
+        setOfficePin(current.pin || current.office_pin || '');
+        setLatitude(Number(current.latitude ?? current.office_lat ?? 0));
+        setLongitude(Number(current.longitude ?? current.office_long ?? 0));
+        setRadiusMeters(current.radius_meters || current.geofence_radius || 100);
+        setOfficeStartTime(current.office_start_time || current.shift_start_time || '10:00 AM');
+        setOfficeStartTimeIso('');
+        setOfficeEndTime(current.office_end_time || current.shift_end_time || '05:30 PM');
+        setOfficeEndTimeIso('');
+        setBreakAllowance(current.break_allowance || current.standard_break_allowance_minutes || 60);
+        setGracePeriod(current.grace_period || current.break_grace_period_minutes || 15);
+      } else {
+        setSelectedOfficeId('');
+        setIsEditingOffice(false);
+      }
     }
-  }, [offices]);
+  }, [offices, selectedOfficeId]);
 
   const handleOfficeSelect = (id: string) => {
     setSelectedOfficeId(id);
+    setIsEditingOffice(false);
     const off = offices.find((o) => o.id === id);
     if (off) {
       setOfficeName(off.office_name);
@@ -523,7 +529,7 @@ export const GeofenceCalibration: React.FC = () => {
             </h3>
           </div>
           <span className="text-[11px] text-slate-500">
-            Select an office below to calibrate its coordinates & policy rules
+            Click an office card to view details &amp; calibrate settings
           </span>
         </div>
 
@@ -619,17 +625,110 @@ export const GeofenceCalibration: React.FC = () => {
         </div>
       )}
 
-      {/* Main Calibration Form for Selected Office */}
-      {!activeOffice ? (
-        <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 shadow-xs">
-          <MapPin className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-          <h4 className="text-sm font-bold text-slate-700">No Office Selected</h4>
-          <p className="text-xs text-slate-500 mt-1">
-            Please register or select an office above to calibrate its geofence and attendance rules.
-          </p>
+      {/* Selected Office Details View OR Edit Calibration Form (Hidden by default until an office is clicked) */}
+      {activeOffice && !isEditingOffice && (
+        <div className="bg-white rounded-2xl border border-indigo-200 shadow-sm overflow-hidden animate-fade-in">
+          <div className="px-5 py-4 bg-gradient-to-r from-indigo-50 via-blue-50 to-slate-50 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-xs">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    {activeOffice.office_name}
+                  </h3>
+                  {activeOffice.office_code && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase font-mono bg-blue-100 text-blue-800 border border-blue-200">
+                      {activeOffice.office_code}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Registered Office Details & Policy Configuration
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsEditingOffice(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-xs transition cursor-pointer"
+              >
+                <Compass className="w-3.5 h-3.5" />
+                <span>Edit / Calibrate Office</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedOfficeId('')}
+                className="inline-flex items-center gap-1 px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-semibold rounded-xl text-xs transition cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Close</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-5 text-xs">
+            {/* Location & Address */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Location & Address</span>
+              </div>
+              <div className="space-y-1 text-slate-700">
+                <p><span className="font-semibold text-slate-500">Locality:</span> {activeOffice.locality || activeOffice.office_locality || '—'}</p>
+                <p><span className="font-semibold text-slate-500">City:</span> {activeOffice.city || activeOffice.office_city || '—'}</p>
+                <p><span className="font-semibold text-slate-500">State:</span> {activeOffice.state || activeOffice.office_state || '—'}</p>
+                <p><span className="font-semibold text-slate-500">Area PIN:</span> <span className="font-mono font-bold">{activeOffice.pin || activeOffice.office_pin || '—'}</span></p>
+              </div>
+            </div>
+
+            {/* GPS Geofence */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <Compass className="w-3.5 h-3.5 text-blue-600" />
+                <span>GPS Geofence Boundary</span>
+              </div>
+              <div className="space-y-1 text-slate-700 font-mono">
+                <p><span className="font-sans font-semibold text-slate-500">Latitude:</span> {Number(activeOffice.latitude ?? activeOffice.office_lat ?? 0).toFixed(6)}° N</p>
+                <p><span className="font-sans font-semibold text-slate-500">Longitude:</span> {Number(activeOffice.longitude ?? activeOffice.office_long ?? 0).toFixed(6)}° E</p>
+                <p><span className="font-sans font-semibold text-slate-500">Radius:</span> <span className="font-bold text-blue-700">{activeOffice.radius_meters || activeOffice.geofence_radius || 100} meters</span></p>
+              </div>
+            </div>
+
+            {/* Timings & Break Policy */}
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Timings & Break Policy</span>
+              </div>
+              <div className="space-y-1 text-slate-700">
+                <p><span className="font-semibold text-slate-500">Start Time:</span> <span className="font-mono font-bold">{activeOffice.office_start_time || activeOffice.shift_start_time || '10:00 AM'}</span></p>
+                <p><span className="font-semibold text-slate-500">End Time:</span> <span className="font-mono font-bold">{activeOffice.office_end_time || activeOffice.shift_end_time || '05:30 PM'}</span></p>
+                <p><span className="font-semibold text-slate-500">Break Allowance:</span> <span className="font-mono font-bold">{activeOffice.break_allowance ?? activeOffice.standard_break_allowance_minutes ?? 60} mins</span></p>
+                <p><span className="font-semibold text-slate-500">Grace Period:</span> <span className="font-mono font-bold">{activeOffice.grace_period ?? activeOffice.break_grace_period_minutes ?? 15} mins</span></p>
+              </div>
+            </div>
+          </div>
         </div>
-      ) : (
+      )}
+
+      {activeOffice && isEditingOffice && (
         <form onSubmit={handleSaveCalibration} className="space-y-6">
+          <div className="flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5">
+            <span className="text-xs font-bold text-indigo-900">
+              Calibrating: {activeOffice.office_name}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsEditingOffice(false)}
+              className="text-xs font-semibold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
+            >
+              Back to Office Details
+            </button>
+          </div>
           {Object.keys(mainErrors).length > 0 && (
             <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold flex items-center gap-2.5">
               <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
@@ -662,7 +761,7 @@ export const GeofenceCalibration: React.FC = () => {
                       setOfficeName(e.target.value);
                       if (mainErrors.name) setMainErrors((p) => { const n = { ...p }; delete n.name; return n; });
                     }}
-                    placeholder="e.g. Tripura Jal Board - Headquarters"
+                    placeholder="e.g. Headquarters Division"
                     className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-600 focus:outline-none ${mainErrors.name ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
                       }`}
                   />
@@ -698,7 +797,7 @@ export const GeofenceCalibration: React.FC = () => {
                     </span>
                   ) : (
                     <span className="text-[10px] text-slate-400 mt-1 block">
-                      Short form like Tripura Jal Board as <strong>TJB</strong>
+                      Short form of the office name (e.g. <strong>HQ</strong>)
                     </span>
                   )}
                 </div>
@@ -1123,7 +1222,7 @@ export const GeofenceCalibration: React.FC = () => {
                       setNewOfficeName(e.target.value);
                       if (modalErrors.name) setModalErrors((p) => { const n = { ...p }; delete n.name; return n; });
                     }}
-                    placeholder="e.g. Tripura Jal Board - Headquarters"
+                    placeholder="e.g. Headquarters Division"
                     className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-lg text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-blue-600 focus:outline-none ${modalErrors.name ? 'border-rose-500 bg-rose-50/30' : 'border-slate-300'
                       }`}
                   />
@@ -1159,7 +1258,7 @@ export const GeofenceCalibration: React.FC = () => {
                     </span>
                   ) : (
                     <span className="text-[10px] text-slate-400 mt-1 block">
-                      Short form like Tripura Jal Board as <strong>TJB</strong>
+                      Short form of the office name (e.g. <strong>HQ</strong>)
                     </span>
                   )}
                 </div>

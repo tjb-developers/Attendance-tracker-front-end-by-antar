@@ -10,6 +10,7 @@ import {
   OfficialDutyRequest,
   UserRole,
   Holiday,
+  Announcement,
 } from '../types';
 import {
   authApi,
@@ -22,9 +23,11 @@ import {
   correctionsApi,
   auditLogsApi,
   holidaysApi,
+  announcementsApi,
   setAuthToken,
   clearAuthToken,
   getAuthToken,
+  setSuppressGlobalLoader,
 } from '../services/apiClient';
 
 interface AppContextType {
@@ -42,6 +45,7 @@ interface AppContextType {
   corrections: AttendanceCorrection[];
   auditLogs: AuditLog[];
   holidays: Holiday[];
+  announcements: Announcement[];
   isLoading: boolean;
   lastUpdated: Date;
   refreshData: () => Promise<void>;
@@ -55,12 +59,34 @@ interface AppContextType {
   logout: () => void;
 
   // Actions connecting to real backend REST APIs
-  addEmployee: (emp: Omit<Employee, 'id' | 'created_at'>) => Promise<boolean>;
-  updateEmployee: (id: string, emp: Partial<Employee>) => Promise<boolean>;
+  addEmployee: (
+    emp: Omit<Employee, 'id' | 'created_at'> &
+      Record<string, any> & { photoFile?: File | null; password?: string }
+  ) => Promise<boolean>;
+  updateEmployee: (
+    id: string,
+    emp: Partial<Employee> & Record<string, any> & { photoFile?: File | null }
+  ) => Promise<boolean>;
   toggleEmployeeStatus: (id: string) => Promise<boolean>;
 
-  addAdmin: (admin: Omit<AdminUser, 'id' | 'created_at'>) => Promise<boolean>;
-  updateAdmin: (id: string, admin: Partial<AdminUser>) => Promise<boolean>;
+  addAdmin: (
+    admin: Omit<AdminUser, 'id' | 'created_at'> & {
+      employee_code?: string;
+      office_id?: string;
+      emp_official_id?: string;
+      emp_phone?: string;
+      emp_locality?: string;
+      emp_city?: string;
+      emp_state?: string;
+      emp_pin?: number | null;
+      emp_DOB?: string | null;
+      emp_DOJ?: string | null;
+      emp_photo_url?: string | null;
+      photoFile?: File | null;
+      password?: string;
+    }
+  ) => Promise<boolean>;
+  updateAdmin: (id: string, admin: Partial<AdminUser> & { photoFile?: File | null }) => Promise<boolean>;
   toggleAdminStatus: (id: string) => Promise<boolean>;
 
   addOffice: (officeData: Omit<Office, 'id' | 'created_at'>) => Promise<boolean>;
@@ -69,6 +95,23 @@ interface AppContextType {
   addHoliday: (holidayData: Omit<Holiday, 'id' | 'created_at'>) => Promise<boolean>;
   updateHoliday: (id: string, holidayData: Partial<Holiday>) => Promise<boolean>;
   deleteHoliday: (id: string) => Promise<boolean>;
+
+  addAnnouncement: (
+    announcementData: Omit<Announcement, 'id' | 'created_at'>
+  ) => Promise<boolean>;
+  deleteAnnouncement: (id: string) => Promise<boolean>;
+
+  updateProfile: (profileData: {
+    full_name: string;
+    emp_phone?: string;
+    emp_locality?: string;
+    emp_city?: string;
+    emp_state?: string;
+    emp_pin?: number | null;
+    emp_DOB?: string | null;
+    photoFile?: File | null;
+    photoPreviewUrl?: string | null;
+  }) => Promise<boolean>;
 
   updateOfficeCalibration: (
     officeId: string,
@@ -210,6 +253,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [corrections, setCorrections] = useState<AttendanceCorrection[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
 
   const [selectedOfficeId, setSelectedOfficeId] = useState<string>('all');
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -218,11 +262,58 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const isSuperAdmin = currentUser?.role === 'super_admin';
   const currentRole = currentUser?.role || 'admin';
 
+  const MONTH_NAMES = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  const normalizeHoliday = (h: any): Holiday => {
+    const yearNum = Number(h.holiday_year ?? h.year ?? new Date().getFullYear());
+    let monthName = h.holiday_month ? String(h.holiday_month).trim() : '';
+    let dayStr = h.holiday_day ? String(h.holiday_day).trim() : '';
+    let dateStr = h.holiday_date ? String(h.holiday_date).trim() : '';
+
+    if (!dateStr && yearNum && monthName && dayStr) {
+      const mIdx = MONTH_NAMES.findIndex((m) => m.toLowerCase() === monthName.toLowerCase());
+      const mNum = mIdx >= 0 ? mIdx + 1 : parseInt(monthName, 10) || 1;
+      const dNum = parseInt(dayStr, 10) || 1;
+      dateStr = `${yearNum}-${String(mNum).padStart(2, '0')}-${String(dNum).padStart(2, '0')}`;
+    } else if (dateStr) {
+      const parsed = new Date(`${dateStr}T00:00:00`);
+      if (!isNaN(parsed.getTime())) {
+        if (!monthName) monthName = MONTH_NAMES[parsed.getMonth()];
+        if (!dayStr) dayStr = String(parsed.getDate());
+      }
+    }
+
+    const reason = h.holiday_reason || h.holiday_name || 'Holiday';
+
+    return {
+      ...h,
+      id: h.id || h.holiday_id || `hol-${Math.random().toString(36).slice(2)}`,
+      holiday_id: h.holiday_id || h.id,
+      holiday_name: reason,
+      holiday_reason: reason,
+      holiday_date: dateStr || `${yearNum}-01-01`,
+      holiday_month: monthName || 'January',
+      holiday_day: dayStr || '1',
+      holiday_year: yearNum,
+      year: yearNum,
+      'no._of_holiday_current_year': h['no._of_holiday_current_year'] ?? null,
+      holiday_type: (h.holiday_type || 'gazetted') as any,
+      office_id: h.office_id ?? null,
+      description: h.description ?? null,
+      created_at: h.created_at || new Date().toISOString(),
+    };
+  };
+
   // Helper to safely extract arrays from both raw arrays and { success, data } envelopes
   const extractArray = <T,>(payload: any): T[] => {
     if (Array.isArray(payload)) return payload;
     if (Array.isArray(payload?.data)) return payload.data;
     if (Array.isArray(payload?.offices)) return payload.offices;
+    if (Array.isArray(payload?.holidays)) return payload.holidays;
+    if (Array.isArray(payload?.announcements)) return payload.announcements;
     return [];
   };
 
@@ -289,13 +380,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   };
 
-  const normalizeUser = (u: any): AdminUser => ({
-    id: u.id || u.user_id || u.sub || 'usr-default',
-    email: u.email || '',
-    full_name: u.full_name || u.name || 'Administrator',
+  const normalizeUser = (u: any): AdminUser & Record<string, any> => ({
+    ...u,
+    id: u.id || u.user_id || u.emp_id || u.sub || 'usr-default',
+    email: u.email || u.emp_email || '',
+    full_name: u.full_name || u.emp_name || u.name || 'Administrator',
+    emp_photo_url: u.emp_photo_url || u.photo_url || null,
+    assigned_office_name: u.office_name || u.assigned_office_name || u.office?.office_name || '',
+    assigned_office_code: u.office_code || u.assigned_office_code || u.office?.office_code || '',
     role: (u.role || u.user_role || 'admin') as any,
     status: (u.status || u.user_status || 'active') as any,
-    assigned_office_ids: Array.isArray(u.assigned_office_ids) ? u.assigned_office_ids : [],
+    assigned_office_ids: Array.isArray(u.assigned_office_ids)
+      ? u.assigned_office_ids
+      : u.office_id
+        ? [u.office_id]
+        : u.emp_official_id
+          ? [u.emp_official_id]
+          : u.office?.office_id
+            ? [u.office.office_id]
+            : u.office?.id
+              ? [u.office.id]
+              : [],
     created_at: u.created_at || new Date().toISOString(),
   });
 
@@ -365,7 +470,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // 6. Fetch holidays
       const holRes = await holidaysApi.getAll({ office_id: selectedOfficeId });
-      const newHolidays = extractArray<Holiday>(holRes.data);
+      const newHolidays = extractArray<any>(holRes.data).map(normalizeHoliday);
       setHolidays(newHolidays);
 
       // 7. Fetch official duties
@@ -380,7 +485,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setCorrections(extractArray<AttendanceCorrection>(corrRes.data));
       }
 
-      // 9. If Super Admin, fetch system audit logs
+      // 9. Fetch announcements (Admin & Super Admin)
+      const annRes = await announcementsApi.getAll({ office_id: selectedOfficeId });
+      if (annRes.data) {
+        setAnnouncements(extractArray<Announcement>(annRes.data));
+      }
+
+      // 10. If Super Admin, fetch system audit logs
       if (isSuperAdmin) {
         const auditRes = await auditLogsApi.getAll();
         if (auditRes.data) {
@@ -457,11 +568,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [currentUser, selectedOfficeId]);
 
-  // Periodic ticker for live attendance sync
+  // Periodic ticker for live attendance sync (silent background refresh)
   useEffect(() => {
     if (!currentUser) return;
     const interval = setInterval(() => {
-      refreshData();
+      setSuppressGlobalLoader(true);
+      refreshData().finally(() => setSuppressGlobalLoader(false));
     }, 25000);
     return () => clearInterval(interval);
   }, [currentUser, selectedOfficeId]);
@@ -470,9 +582,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const login = async (
     email: string,
     password?: string,
-    requestedRole: 'admin' | 'super_admin' = 'admin'
+    requestedRole?: 'admin' | 'super_admin'
   ): Promise<{ success: boolean; error?: string }> => {
-    setIsLoading(true);
     const trimmed = email.trim();
 
     try {
@@ -480,7 +591,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const res = await authApi.login({ email: trimmed, password });
 
       if (res.error || !res.data) {
-        setIsLoading(false);
         return {
           success: false,
           error: res.error || 'Invalid email or password. Please verify your credentials.',
@@ -491,14 +601,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const rawUser = res.data.user;
         const user = normalizeUser({
           ...rawUser,
-          role: rawUser.role || requestedRole,
+          role: rawUser.role || requestedRole || 'admin',
         });
 
         if (user.role === ('employee' as any)) {
-          setIsLoading(false);
           return {
             success: false,
-            error: 'Access Denied: The Web Portal is strictly for Admins and Super Admins. Employees must use the Mobile App.',
+            error: 'Access Denied: The Web Portal is strictly for Administrators. Employees must use the Mobile App.',
           };
         }
 
@@ -514,17 +623,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           setSelectedOfficeId('all');
         }
 
-        setIsLoading(false);
         return { success: true };
       }
 
-      setIsLoading(false);
       return {
         success: false,
         error: res.error || 'Authentication failed. Please check your credentials.',
       };
     } catch (err: any) {
-      setIsLoading(false);
       return {
         success: false,
         error: err?.message || 'Failed to reach authentication server.',
@@ -552,27 +658,59 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // REAL API ACTIONS (NO LOCAL STORAGE CACHING)
   // ===========================================================================
 
-  const addEmployee = async (empData: Omit<Employee, 'id' | 'created_at'>): Promise<boolean> => {
-    // 1. If password provided, register auth credentials
-    if ((empData as any).password) {
-      try {
-        await authApi.register({
-          emp_name: empData.full_name,
-          email: empData.email,
-          password: (empData as any).password,
-          role: 'employee',
-          emp_phone: empData.mobile_number,
-        });
-      } catch {}
+  const addEmployee = async (
+    empData: Omit<Employee, 'id' | 'created_at'> &
+      Record<string, any> & { photoFile?: File | null; password?: string }
+  ): Promise<boolean> => {
+    const empCode = (empData.employee_code || '').trim().toUpperCase();
+    const phone = (empData.emp_phone || empData.mobile_number || '').trim() || null;
+    const locality = empData.emp_locality?.trim() || null;
+    const city = empData.emp_city?.trim() || null;
+    const state = empData.emp_state?.trim() || null;
+    const fullAddress =
+      empData.residential_address?.trim() ||
+      [locality, city, state, empData.emp_pin].filter(Boolean).join(', ') ||
+      null;
+    const targetOfficeId = empData.emp_official_id || empData.office_id;
+
+    const jsonPayload = {
+      full_name: empData.full_name.trim(),
+      emp_name: empData.full_name.trim(),
+      email: empData.email.trim().toLowerCase(),
+      emp_email: empData.email.trim().toLowerCase(),
+      emp_desig: (empData.emp_desig || empData.designation || '').trim() || null,
+      designation: (empData.emp_desig || empData.designation || '').trim() || undefined,
+      mobile_number: phone,
+      emp_phone: phone,
+      employee_code: empCode,
+      office_id: targetOfficeId,
+      emp_official_id: targetOfficeId,
+      emp_locality: locality,
+      emp_city: city,
+      emp_state: state,
+      emp_pin: empData.emp_pin ?? null,
+      residential_address: fullAddress,
+      date_of_birth: empData.emp_DOB || empData.date_of_birth || null,
+      emp_DOB: empData.emp_DOB || empData.date_of_birth || null,
+      emp_DOJ: empData.emp_DOJ || null,
+      emp_photo_url: empData.emp_photo_url?.trim() || null,
+      password: empData.password?.trim() || undefined,
+      role: 'employee',
+    };
+
+    let requestBody: any = jsonPayload;
+    if (empData.photoFile) {
+      const fd = new FormData();
+      Object.entries(jsonPayload).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '') {
+          fd.append(key, String(val));
+        }
+      });
+      fd.append('photo', empData.photoFile, empData.photoFile.name);
+      requestBody = fd;
     }
 
-    // 2. Insert into Employee table via backend API
-    const res = await employeesApi.create({
-      full_name: empData.full_name,
-      email: empData.email,
-      designation: empData.designation,
-      mobile_number: empData.mobile_number,
-    });
+    const res = await employeesApi.create(requestBody);
 
     if (res.error) {
       alert(`Failed to add employee: ${res.error}`);
@@ -583,8 +721,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return true;
   };
 
-  const updateEmployee = async (id: string, empData: Partial<Employee>): Promise<boolean> => {
-    const res = await employeesApi.update(id, empData);
+  const updateEmployee = async (
+    id: string,
+    empData: Partial<Employee> & Record<string, any> & { photoFile?: File | null }
+  ): Promise<boolean> => {
+    let requestBody: any = empData;
+    if (empData.photoFile) {
+      const { photoFile, ...rest } = empData;
+      const fd = new FormData();
+      Object.entries(rest).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '') {
+          fd.append(key, Array.isArray(val) ? JSON.stringify(val) : String(val));
+        }
+      });
+      fd.append('photo', photoFile, photoFile.name);
+      requestBody = fd;
+    }
+
+    const res = await employeesApi.update(id, requestBody);
     if (res.error) {
       alert(`Failed to update employee: ${res.error}`);
       return false;
@@ -595,7 +749,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const toggleEmployeeStatus = async (id: string): Promise<boolean> => {
     const emp = employees.find((e) => e.id === id);
-    const nextStatus = emp?.status === 'active' ? 'suspended' : 'active';
+    const nextStatus = emp?.status === 'active' ? 'inactive' : 'active';
     const res = await employeesApi.toggleStatus(id, nextStatus);
     if (res.error) {
       alert(`Failed to update employee status: ${res.error}`);
@@ -605,14 +759,80 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return true;
   };
 
-  const addAdmin = async (adminData: Omit<AdminUser, 'id' | 'created_at'>): Promise<boolean> => {
-    const res = await authApi.register({
-      emp_name: adminData.full_name,
-      email: adminData.email,
-      password: (adminData as any).password || 'Admin@123',
-      role: adminData.role || 'admin',
-      emp_phone: '',
-    });
+  const addAdmin = async (
+    adminData: Omit<AdminUser, 'id' | 'created_at'> & {
+      employee_code?: string;
+      office_id?: string;
+      emp_official_id?: string;
+      emp_phone?: string;
+      emp_locality?: string;
+      emp_city?: string;
+      emp_state?: string;
+      emp_pin?: number | null;
+      emp_DOB?: string | null;
+      emp_DOJ?: string | null;
+      emp_photo_url?: string | null;
+      photoFile?: File | null;
+      password?: string;
+    }
+  ): Promise<boolean> => {
+    const targetOfficeId =
+      adminData.emp_official_id ||
+      adminData.office_id ||
+      (Array.isArray(adminData.assigned_office_ids) ? adminData.assigned_office_ids[0] : '') ||
+      '';
+    const empCode = (adminData.employee_code || '').trim().toUpperCase();
+    const initialPassword = adminData.password?.trim() || '';
+    const phone = adminData.emp_phone?.trim() || null;
+    const locality = adminData.emp_locality?.trim() || null;
+    const city = adminData.emp_city?.trim() || null;
+    const state = adminData.emp_state?.trim() || null;
+    const fullAddress = [locality, city, state, adminData.emp_pin].filter(Boolean).join(', ') || undefined;
+
+    const jsonPayload = {
+      full_name: adminData.full_name.trim(),
+      emp_name: adminData.full_name.trim(),
+      email: adminData.email.trim().toLowerCase(),
+      emp_email: adminData.email.trim().toLowerCase(),
+      password: initialPassword,
+      initial_password: initialPassword,
+      role: 'admin',
+      office_id: targetOfficeId || undefined,
+      emp_official_id: targetOfficeId || undefined,
+      assigned_office_ids:
+        Array.isArray(adminData.assigned_office_ids) && adminData.assigned_office_ids.length > 0
+          ? adminData.assigned_office_ids
+          : targetOfficeId
+            ? [targetOfficeId]
+            : [],
+      employee_code: empCode,
+      mobile_number: phone,
+      emp_phone: phone,
+      emp_locality: locality,
+      emp_city: city,
+      emp_state: state,
+      emp_pin: adminData.emp_pin ?? null,
+      residential_address: fullAddress,
+      date_of_birth: adminData.emp_DOB || null,
+      emp_DOB: adminData.emp_DOB || null,
+      emp_DOJ: adminData.emp_DOJ || null,
+      emp_photo_url: adminData.emp_photo_url?.trim() || null,
+      designation: 'Office Admin',
+    };
+
+    let requestBody: any = jsonPayload;
+    if (adminData.photoFile) {
+      const fd = new FormData();
+      Object.entries(jsonPayload).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '') {
+          fd.append(key, Array.isArray(val) ? JSON.stringify(val) : String(val));
+        }
+      });
+      fd.append('photo', adminData.photoFile, adminData.photoFile.name);
+      requestBody = fd;
+    }
+
+    const res = await employeesApi.create(requestBody);
 
     if (res.error) {
       alert(`Failed to create admin: ${res.error}`);
@@ -623,8 +843,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return true;
   };
 
-  const updateAdmin = async (id: string, adminData: Partial<AdminUser>): Promise<boolean> => {
-    const res = await adminsApi.update(id, adminData);
+  const updateAdmin = async (
+    id: string,
+    adminData: Partial<AdminUser> & { photoFile?: File | null }
+  ): Promise<boolean> => {
+    let requestBody: any = adminData;
+    if (adminData.photoFile) {
+      const { photoFile, ...rest } = adminData;
+      const fd = new FormData();
+      Object.entries(rest).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '') {
+          fd.append(key, Array.isArray(val) ? JSON.stringify(val) : String(val));
+        }
+      });
+      fd.append('photo', photoFile, photoFile.name);
+      requestBody = fd;
+    }
+    const res = await adminsApi.update(id, requestBody);
     if (res.error) {
       alert(`Failed to update admin: ${res.error}`);
       return false;
@@ -635,7 +870,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const toggleAdminStatus = async (id: string): Promise<boolean> => {
     const admin = admins.find((a) => a.id === id);
-    const nextStatus = admin?.status === 'active' ? 'suspended' : 'active';
+    const nextStatus = admin?.status === 'active' ? 'inactive' : 'active';
     const res = await adminsApi.toggleStatus(id, nextStatus);
     if (res.error) {
       alert(`Failed to update admin status: ${res.error}`);
@@ -736,8 +971,36 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return true;
   };
 
+  const buildHolidayPayload = (holidayData: Partial<Holiday>) => {
+    const dateStr = holidayData.holiday_date || '';
+    const parsed = dateStr ? new Date(`${dateStr}T00:00:00`) : null;
+    const validDate = parsed && !isNaN(parsed.getTime()) ? parsed : null;
+
+    const yearVal = Number(
+      holidayData.holiday_year ?? holidayData.year ?? (validDate ? validDate.getFullYear() : new Date().getFullYear())
+    );
+    const monthVal =
+      holidayData.holiday_month || (validDate ? MONTH_NAMES[validDate.getMonth()] : 'January');
+    const dayVal =
+      holidayData.holiday_day || (validDate ? String(validDate.getDate()) : '1');
+    const reasonVal = (holidayData.holiday_reason || holidayData.holiday_name || '').trim();
+
+    return {
+      ...holidayData,
+      holiday_name: reasonVal,
+      holiday_reason: reasonVal,
+      holiday_month: monthVal,
+      holiday_day: dayVal,
+      holiday_year: yearVal,
+      year: yearVal,
+      'no._of_holiday_current_year':
+        holidayData['no._of_holiday_current_year'] ??
+        holidays.filter((h) => h.year === yearVal).length + 1,
+    };
+  };
+
   const addHoliday = async (holidayData: Omit<Holiday, 'id' | 'created_at'>): Promise<boolean> => {
-    const res = await holidaysApi.create(holidayData);
+    const res = await holidaysApi.create(buildHolidayPayload(holidayData));
     if (res.error) {
       alert(`Failed to add holiday: ${res.error}`);
       return false;
@@ -747,7 +1010,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateHoliday = async (id: string, holidayData: Partial<Holiday>): Promise<boolean> => {
-    const res = await holidaysApi.update(id, holidayData);
+    const res = await holidaysApi.update(id, buildHolidayPayload(holidayData));
     if (res.error) {
       alert(`Failed to update holiday: ${res.error}`);
       return false;
@@ -763,6 +1026,96 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return false;
     }
     await refreshData();
+    return true;
+  };
+
+  const addAnnouncement = async (
+    announcementData: Omit<Announcement, 'id' | 'created_at'>
+  ): Promise<boolean> => {
+    const res = await announcementsApi.create({
+      ...announcementData,
+      created_by: currentUser?.id,
+      created_by_role: currentUser?.role,
+    });
+    if (res.error) {
+      alert(`Failed to publish announcement: ${res.error}`);
+      return false;
+    }
+    await refreshData();
+    return true;
+  };
+
+  const deleteAnnouncement = async (id: string): Promise<boolean> => {
+    const res = await announcementsApi.delete(id);
+    if (res.error) {
+      alert(`Failed to delete announcement: ${res.error}`);
+      return false;
+    }
+    await refreshData();
+    return true;
+  };
+
+  const updateProfile = async (profileData: {
+    full_name: string;
+    emp_phone?: string;
+    emp_locality?: string;
+    emp_city?: string;
+    emp_state?: string;
+    emp_pin?: number | null;
+    emp_DOB?: string | null;
+    photoFile?: File | null;
+    photoPreviewUrl?: string | null;
+  }): Promise<boolean> => {
+    if (!currentUser || isSuperAdmin) return false;
+    const payload = {
+      full_name: profileData.full_name.trim(),
+      emp_name: profileData.full_name.trim(),
+      mobile_number: profileData.emp_phone?.trim() || null,
+      emp_phone: profileData.emp_phone?.trim() || null,
+      emp_locality: profileData.emp_locality?.trim() || null,
+      emp_city: profileData.emp_city?.trim() || null,
+      emp_state: profileData.emp_state?.trim() || null,
+      emp_pin: profileData.emp_pin ?? null,
+      date_of_birth: profileData.emp_DOB || null,
+      emp_DOB: profileData.emp_DOB || null,
+    };
+
+    let requestBody: any = payload;
+    if (profileData.photoFile) {
+      const fd = new FormData();
+      Object.entries(payload).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '') {
+          fd.append(key, String(val));
+        }
+      });
+      fd.append('photo', profileData.photoFile, profileData.photoFile.name);
+      requestBody = fd;
+    }
+
+    const res = await employeesApi.update(currentUser.id, requestBody);
+    if (res.error) {
+      alert(`Failed to update profile: ${res.error}`);
+      return false;
+    }
+
+    const resData = res.data as any;
+    const updatedPhotoUrl =
+      resData?.employee?.emp_photo_url ||
+      resData?.user?.emp_photo_url ||
+      resData?.emp_photo_url ||
+      profileData.photoPreviewUrl ||
+      undefined;
+
+    setCurrentUser((prev) =>
+      prev
+        ? {
+            ...prev,
+            ...payload,
+            full_name: payload.full_name,
+            ...(updatedPhotoUrl ? { emp_photo_url: updatedPhotoUrl } : {}),
+          }
+        : prev
+    );
     return true;
   };
 
@@ -922,6 +1275,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         corrections,
         auditLogs,
         holidays,
+        announcements,
         isLoading,
         lastUpdated,
         refreshData,
@@ -938,6 +1292,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         addHoliday,
         updateHoliday,
         deleteHoliday,
+        addAnnouncement,
+        deleteAnnouncement,
+        updateProfile,
         updateOfficeCalibration,
         approveLeave,
         rejectLeave,

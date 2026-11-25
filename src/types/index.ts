@@ -226,8 +226,14 @@ export type HolidayType = 'gazetted' | 'restricted' | 'state_declared' | 'local_
 
 export interface Holiday {
   id: string;
+  holiday_id?: string;
   holiday_name: string;
+  holiday_reason?: string | null;
   holiday_date: string; // YYYY-MM-DD
+  holiday_month?: string | null;
+  holiday_day?: string | null;
+  holiday_year?: number | null;
+  'no._of_holiday_current_year'?: number | null;
   end_date?: string | null; // For multi-day holidays e.g. Durga Puja
   year: number; // e.g. 2026
   holiday_type: HolidayType;
@@ -236,6 +242,24 @@ export interface Holiday {
   created_by?: string;
   created_at: string;
   updated_at?: string;
+}
+
+export type AnnouncementType = 'text' | 'pdf';
+
+export interface Announcement {
+  id: string;
+  title: string;
+  type: AnnouncementType;
+  content?: string | null; // Text body when type === 'text'
+  pdf_base64?: string | null; // Compressed Base64 string when type === 'pdf'
+  file_name?: string | null;
+  is_compressed?: boolean;
+  original_size_bytes?: number | null;
+  compressed_size_bytes?: number | null;
+  office_id?: string | null;
+  created_by?: string;
+  created_by_role?: UserRole;
+  created_at: string;
 }
 
 

@@ -5,6 +5,27 @@
 
 const STORAGE_KEY_AUTH_TOKEN = 'tjb_auth_token';
 
+let activeRequests = 0;
+let suppressGlobalLoader = false;
+const loadingListeners = new Set<(isBusy: boolean) => void>();
+
+export function subscribeApiLoading(listener: (isBusy: boolean) => void): () => void {
+  loadingListeners.add(listener);
+  listener(activeRequests > 0);
+  return () => {
+    loadingListeners.delete(listener);
+  };
+}
+
+export function setSuppressGlobalLoader(val: boolean) {
+  suppressGlobalLoader = val;
+}
+
+function notifyLoading() {
+  const busy = activeRequests > 0;
+  loadingListeners.forEach((fn) => fn(busy));
+}
+
 export function getApiBaseUrl(): string {
   const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
   return envUrl ? envUrl.replace(/\/+$/, '') : 'http://localhost:8000/api/v1';
@@ -51,14 +72,21 @@ export async function apiRequest<T = any>(
   const url = `${baseUrl}${cleanEndpoint}`;
 
   const token = getAuthToken();
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     Accept: 'application/json',
     ...(options.headers as Record<string, string>),
   };
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const trackLoading = !suppressGlobalLoader;
+  if (trackLoading) {
+    activeRequests++;
+    notifyLoading();
   }
 
   try {
@@ -87,6 +115,11 @@ export async function apiRequest<T = any>(
       error: err?.message || 'Failed to reach Backend API server. Please ensure the backend server is running.',
       status: 0,
     };
+  } finally {
+    if (trackLoading) {
+      activeRequests = Math.max(0, activeRequests - 1);
+      notifyLoading();
+    }
   }
 }
 
@@ -129,7 +162,10 @@ export const adminsApi = {
   getAll: () => apiRequest('/admins', { method: 'GET' }),
   create: (payload: any) => apiRequest('/admins', { method: 'POST', body: JSON.stringify(payload) }),
   update: (id: string, payload: any) =>
-    apiRequest(`/admins/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+    apiRequest(`/admins/${id}`, {
+      method: 'PUT',
+      body: payload instanceof FormData ? payload : JSON.stringify(payload),
+    }),
   toggleStatus: (id: string, status: string) =>
     apiRequest(`/admins/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
 };
@@ -142,9 +178,16 @@ export const employeesApi = {
     if (params?.status) q.set('status', params.status);
     return apiRequest(`/employees?${q.toString()}`, { method: 'GET' });
   },
-  create: (payload: any) => apiRequest('/employees', { method: 'POST', body: JSON.stringify(payload) }),
+  create: (payload: any) =>
+    apiRequest('/employees', {
+      method: 'POST',
+      body: payload instanceof FormData ? payload : JSON.stringify(payload),
+    }),
   update: (id: string, payload: any) =>
-    apiRequest(`/employees/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+    apiRequest(`/employees/${id}`, {
+      method: 'PUT',
+      body: payload instanceof FormData ? payload : JSON.stringify(payload),
+    }),
   toggleStatus: (id: string, status: string) =>
     apiRequest(`/employees/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
 };
@@ -243,4 +286,17 @@ export const auditLogsApi = {
     if (params?.limit) q.set('limit', String(params.limit));
     return apiRequest(`/audit-logs?${q.toString()}`, { method: 'GET' });
   },
+};
+
+export const announcementsApi = {
+  getAll: (params?: { office_id?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.office_id && params.office_id !== 'all') q.set('office_id', params.office_id);
+    const qs = q.toString();
+    return apiRequest(`/announcements${qs ? `?${qs}` : ''}`, { method: 'GET' });
+  },
+  create: (payload: any) =>
+    apiRequest('/announcements', { method: 'POST', body: JSON.stringify(payload) }),
+  delete: (id: string) =>
+    apiRequest(`/announcements/${id}`, { method: 'DELETE' }),
 };

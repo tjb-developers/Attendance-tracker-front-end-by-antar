@@ -115,17 +115,6 @@ export const OfficeOutDutyDesk: React.FC = () => {
         </div>
       </div>
 
-      {/* Info card */}
-      <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-950 flex items-start gap-2.5">
-        <ShieldCheck className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-        <div>
-          <span className="font-bold">Tripura Jal Board Business Rule: </span>
-          <span>
-            When field inspectors or technicians conduct on-site pump maintenance or pipeline surveys outside office radius, they submit an Office Out Duty session. Upon administrative approval, the duration is officially credited to their working hours.
-          </span>
-        </div>
-      </div>
-
       {/* Table Card */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {/* Controls */}

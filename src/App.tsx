@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from './context/AppContext';
+import { subscribeApiLoading } from './services/apiClient';
+import { LoadingOverlay } from './components/common/LoadingOverlay';
 import { LoginPage } from './components/auth/LoginPage';
 import { Sidebar, ActiveTab } from './components/layout/Sidebar';
 import { TopHeader } from './components/layout/TopHeader';
@@ -9,6 +11,7 @@ import { LeaveApprovalDesk } from './components/leave/LeaveApprovalDesk';
 import { OfficeOutDutyDesk } from './components/outduty/OfficeOutDutyDesk';
 import { AttendanceCorrectionsDesk } from './components/corrections/AttendanceCorrectionsDesk';
 import { ReportsAndAnalytics } from './components/reports/ReportsAndAnalytics';
+import { Announcements } from './components/announcements/Announcements';
 import { AdminManagement } from './components/superadmin/AdminManagement';
 import { GeofenceCalibration } from './components/superadmin/GeofenceCalibration';
 import { HolidayManagement } from './components/superadmin/HolidayManagement';
@@ -19,10 +22,25 @@ export const AppContent: React.FC = () => {
   const { currentUser, isSuperAdmin, isLoading } = useApp();
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isApiBusy, setIsApiBusy] = useState(false);
+
+  useEffect(() => {
+    return subscribeApiLoading(setIsApiBusy);
+  }, []);
+
+  // Show full-screen loading animation while restoring session on refresh (prevents LoginPage flash)
+  if (isLoading) {
+    return <LoadingOverlay fullScreen message="Restoring session..." />;
+  }
 
   // If user is not authenticated, show real login screen
   if (!currentUser) {
-    return <LoginPage />;
+    return (
+      <>
+        {isApiBusy && <LoadingOverlay message="Logging in..." />}
+        <LoginPage />
+      </>
+    );
   }
 
   // Ensure office admin cannot access super admin tabs
@@ -31,6 +49,7 @@ export const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
+      {isApiBusy && <LoadingOverlay message="Loading..." />}
       {/* Sidebar Navigation */}
       <Sidebar
         activeTab={effectiveTab}
@@ -54,9 +73,10 @@ export const AppContent: React.FC = () => {
           {effectiveTab === 'outduty' && <OfficeOutDutyDesk />}
           {effectiveTab === 'corrections' && <AttendanceCorrectionsDesk />}
           {effectiveTab === 'reports' && <ReportsAndAnalytics />}
+          {effectiveTab === 'announcements' && <Announcements />}
+          {effectiveTab === 'holidays' && <HolidayManagement />}
           {effectiveTab === 'superadmin_admins' && <AdminManagement />}
           {effectiveTab === 'superadmin_geofence' && <GeofenceCalibration />}
-          {effectiveTab === 'superadmin_holidays' && <HolidayManagement />}
           {effectiveTab === 'superadmin_override' && <GlobalOverrides />}
           {effectiveTab === 'superadmin_audit' && <SystemAuditLogs />}
         </main>

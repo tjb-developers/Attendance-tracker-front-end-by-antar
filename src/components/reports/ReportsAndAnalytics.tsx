@@ -92,7 +92,7 @@ export const ReportsAndAnalytics: React.FC = () => {
         'Employee Code': employee.employee_code,
         'Full Name': employee.full_name,
         'Designation': employee.designation,
-        'Office': off?.office_name || 'Tripura Jal Board',
+        'Office': off?.office_name || 'Assigned Office',
         'Reporting Period': timeframe.toUpperCase(),
         'Total Working Days': totalWorkingDays,
         'Days Present': daysPresent,
@@ -110,7 +110,7 @@ export const ReportsAndAnalytics: React.FC = () => {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance Report');
     XLSX.writeFile(
       workbook,
-      `Tripura_Jal_Board_Attendance_${timeframe}_${new Date().toISOString().slice(0, 10)}.xlsx`
+      `Attendance_Report_${timeframe}_${new Date().toISOString().slice(0, 10)}.xlsx`
     );
   };
 
@@ -138,7 +138,7 @@ export const ReportsAndAnalytics: React.FC = () => {
         `"${employee.employee_code}"`,
         `"${employee.full_name}"`,
         `"${employee.designation}"`,
-        `"${off?.office_name || 'Tripura Jal Board'}"`,
+        `"${off?.office_name || 'Assigned Office'}"`,
         `"${timeframe.toUpperCase()}"`,
         totalWorkingDays,
         daysPresent,

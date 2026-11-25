@@ -6,6 +6,7 @@ import {
   Coffee,
   Briefcase,
   LogOut,
+  LogIn,
   UserX,
   AlertTriangle,
   Search,
@@ -15,11 +16,22 @@ import {
   Eye,
   ArrowUpRight,
   ShieldAlert,
+  Building2,
+  ShieldCheck,
+  CalendarDays,
+  ClipboardList,
 } from 'lucide-react';
 import { AttendanceSession, Employee } from '../../types';
 
 export const LiveDashboard: React.FC = () => {
   const {
+    isSuperAdmin,
+    admins,
+    employees,
+    leaveRequests,
+    officialDutyRequests,
+    corrections,
+    holidays,
     filteredEmployees,
     filteredSessions,
     excessBreakEmployees,
@@ -48,7 +60,16 @@ export const LiveDashboard: React.FC = () => {
 
   // Status Counts
   const totalStaff = filteredEmployees.length;
-  const presentCount = staffStatusList.filter((s) => s.status === 'working').length;
+  const todayCheckedInCount = staffStatusList.filter(
+    (s) => s.session !== null && (!!s.session.check_in_time || s.status !== 'absent')
+  ).length;
+  const presentCount = staffStatusList.filter(
+    (s) =>
+      s.session !== null &&
+      s.status !== 'checked_out' &&
+      s.status !== 'on_official_work' &&
+      (s.session as any).is_inside_geofence !== false
+  ).length;
   const onBreakCount = staffStatusList.filter((s) => s.status === 'on_break').length;
   const onOutDutyCount = staffStatusList.filter((s) => s.status === 'on_official_work').length;
   const checkedOutCount = staffStatusList.filter((s) => s.status === 'checked_out').length;
@@ -56,21 +77,31 @@ export const LiveDashboard: React.FC = () => {
 
   // Filtered Roster
   const filteredRoster = useMemo(() => {
-    return staffStatusList.filter(({ employee, status }) => {
+    return staffStatusList.filter(({ employee, session, status }) => {
       const matchesSearch =
         employee.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        employee.employee_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        employee.designation.toLowerCase().includes(searchTerm.toLowerCase());
+        (employee.employee_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (employee.designation || '').toLowerCase().includes(searchTerm.toLowerCase());
 
       if (!matchesSearch) return false;
       if (statusFilter === 'all') return true;
+      if (statusFilter === 'checked_in') {
+        return session !== null && (!!session.check_in_time || status !== 'absent');
+      }
+      if (statusFilter === 'working') {
+        return (
+          session !== null &&
+          status !== 'checked_out' &&
+          status !== 'on_official_work' &&
+          (session as any).is_inside_geofence !== false
+        );
+      }
       if (statusFilter === 'excess_break') {
-        const sess = filteredSessions.find((s) => s.employee_id === employee.id);
-        return sess ? sess.actual_break_minutes > 75 : false;
+        return session ? session.actual_break_minutes > 75 : false;
       }
       return status === statusFilter;
     });
-  }, [staffStatusList, searchTerm, statusFilter, filteredSessions]);
+  }, [staffStatusList, searchTerm, statusFilter]);
 
   const formatMins = (minutes: number) => {
     const hrs = Math.floor(minutes / 60);
@@ -98,7 +129,7 @@ export const LiveDashboard: React.FC = () => {
             Live Daily Attendance Dashboard
           </h2>
           <p className="text-xs sm:text-sm text-slate-500">
-            Real-time tracking of staff presence, breaks, and geofence verification for Tripura Jal Board.
+            Real-time tracking of staff presence, breaks, and geofence verification.
           </p>
         </div>
         <div className="text-xs font-medium text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm self-start sm:self-auto flex items-center gap-2">
@@ -106,6 +137,79 @@ export const LiveDashboard: React.FC = () => {
           <span>Live Geofence Radius: 100m</span>
         </div>
       </div>
+
+      {/* System-Wide Overview (Only visible when isSuperAdmin is true) */}
+      {isSuperAdmin && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+          <div className="p-4 bg-gradient-to-br from-indigo-50/70 to-white rounded-2xl border border-indigo-200/80 shadow-xs flex items-center gap-3.5">
+            <div className="p-2.5 rounded-xl bg-indigo-100 text-indigo-700 flex-shrink-0">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700">
+                Registered Offices
+              </p>
+              <p className="text-xl font-extrabold text-slate-900">{offices.length}</p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-gradient-to-br from-blue-50/70 to-white rounded-2xl border border-blue-200/80 shadow-xs flex items-center gap-3.5">
+            <div className="p-2.5 rounded-xl bg-blue-100 text-blue-700 flex-shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">
+                Total Admins
+              </p>
+              <p className="text-xl font-extrabold text-slate-900">
+                {admins.filter((a) => a.role !== 'super_admin').length}
+              </p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-gradient-to-br from-emerald-50/70 to-white rounded-2xl border border-emerald-200/80 shadow-xs flex items-center gap-3.5">
+            <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-700 flex-shrink-0">
+              <Users className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                All Enrolled Staff
+              </p>
+              <p className="text-xl font-extrabold text-slate-900">{employees.length}</p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-gradient-to-br from-amber-50/70 to-white rounded-2xl border border-amber-200/80 shadow-xs flex items-center gap-3.5">
+            <div className="p-2.5 rounded-xl bg-amber-100 text-amber-700 flex-shrink-0">
+              <ClipboardList className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                Pending Approvals
+              </p>
+              <p className="text-xl font-extrabold text-slate-900">
+                {leaveRequests.filter((l) => l.status === 'pending').length +
+                  officialDutyRequests.filter((d) => d.approval_status === 'pending').length +
+                  corrections.filter((c) => c.status === 'pending').length}
+              </p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-gradient-to-br from-purple-50/70 to-white rounded-2xl border border-purple-200/80 shadow-xs flex items-center gap-3.5 col-span-2 sm:col-span-1">
+            <div className="p-2.5 rounded-xl bg-purple-100 text-purple-700 flex-shrink-0">
+              <CalendarDays className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-purple-700">
+                Holidays ({new Date().getFullYear()})
+              </p>
+              <p className="text-xl font-extrabold text-slate-900">
+                {holidays.filter((h) => Number(h.holiday_year ?? h.year) === new Date().getFullYear()).length}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Excess Break Alert Banner */}
       {excessBreakEmployees.length > 0 && (
@@ -156,9 +260,15 @@ export const LiveDashboard: React.FC = () => {
       )}
 
       {/* Live Status Cards (Exact mobile palette) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4">
         {/* Total Staff */}
-        <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+        <button
+          type="button"
+          onClick={() => setStatusFilter('all')}
+          className={`p-4 bg-white rounded-2xl border text-left shadow-xs flex flex-col justify-between transition cursor-pointer ${
+            statusFilter === 'all' ? 'border-slate-400 ring-2 ring-slate-200' : 'border-slate-200/80 hover:border-slate-300'
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Staff</span>
             <div className="p-1.5 rounded-lg bg-slate-100 text-slate-700">
@@ -167,10 +277,35 @@ export const LiveDashboard: React.FC = () => {
           </div>
           <div className="text-2xl font-extrabold text-slate-900">{totalStaff}</div>
           <p className="text-[10px] text-slate-400 mt-1">Enrolled personnel</p>
-        </div>
+        </button>
 
-        {/* Present / Working */}
-        <div className="p-4 bg-white rounded-2xl border border-emerald-100 shadow-xs flex flex-col justify-between relative overflow-hidden">
+        {/* Today's Checked In */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter('checked_in')}
+          className={`p-4 bg-white rounded-2xl border text-left shadow-xs flex flex-col justify-between relative overflow-hidden transition cursor-pointer ${
+            statusFilter === 'checked_in' ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-indigo-100 hover:border-indigo-300'
+          }`}
+        >
+          <div className="absolute top-0 left-0 right-0 h-1 bg-indigo-500" />
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-800">Checked In</span>
+            <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
+              <LogIn className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-extrabold text-indigo-600">{todayCheckedInCount}</div>
+          <p className="text-[10px] text-indigo-700 mt-1">Today&apos;s checked in</p>
+        </button>
+
+        {/* Present / In Office Area Now */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter('working')}
+          className={`p-4 bg-white rounded-2xl border text-left shadow-xs flex flex-col justify-between relative overflow-hidden transition cursor-pointer ${
+            statusFilter === 'working' ? 'border-emerald-400 ring-2 ring-emerald-100' : 'border-emerald-100 hover:border-emerald-300'
+          }`}
+        >
           <div className="absolute top-0 left-0 right-0 h-1 bg-[#10B981]" />
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">Present</span>
@@ -179,8 +314,8 @@ export const LiveDashboard: React.FC = () => {
             </div>
           </div>
           <div className="text-2xl font-extrabold text-emerald-600">{presentCount}</div>
-          <p className="text-[10px] text-emerald-700 mt-1">Inside geofence working</p>
-        </div>
+          <p className="text-[10px] text-emerald-700 mt-1">In office area present now</p>
+        </button>
 
         {/* On Break */}
         <div className="p-4 bg-white rounded-2xl border border-amber-100 shadow-xs flex flex-col justify-between relative overflow-hidden">
@@ -262,9 +397,10 @@ export const LiveDashboard: React.FC = () => {
             </div>
 
             {/* Status Filter */}
-            <div className="flex items-center gap-1 overflow-x-auto py-0.5">
+            <div className="flex flex-wrap items-center gap-1 py-0.5">
               {[
                 { id: 'all', label: 'All' },
+                { id: 'checked_in', label: 'Checked In' },
                 { id: 'working', label: 'Present' },
                 { id: 'on_break', label: 'Break' },
                 { id: 'excess_break', label: 'Excess Break' },
@@ -275,9 +411,9 @@ export const LiveDashboard: React.FC = () => {
                 <button
                   key={pill.id}
                   onClick={() => setStatusFilter(pill.id)}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition whitespace-nowrap ${
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                     statusFilter === pill.id
-                      ? 'bg-navy-900 text-white shadow-xs'
+                      ? 'bg-slate-900 text-white shadow-xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >

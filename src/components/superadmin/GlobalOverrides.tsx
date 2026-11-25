@@ -191,7 +191,7 @@ export const GlobalOverrides: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4 text-slate-600 text-[11px]">
-                      {off?.office_name || 'Tripura Jal Board'}
+                      {off?.office_name || 'Assigned Office'}
                     </td>
 
                     <td className="py-3.5 px-4 font-mono font-medium text-slate-800">
